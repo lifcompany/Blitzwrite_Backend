@@ -82,7 +82,7 @@ See detailed [cookiecutter-django Docker documentation](http://cookiecutter-djan
 
 ### Payment
 
-Strip 
-To learn more about Stripe Payments, click [here](http://www.strip.com).
+Stripe 
+To learn more about Stripe Payments, click [here](http://www.stripe.com).
 
 

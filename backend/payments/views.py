@@ -9,9 +9,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import stripe
 from .forms import PaymentForm
-import stripe
 
-stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def payment_view(request):
     if request.method == 'POST':
@@ -39,13 +38,7 @@ def payment_view(request):
 
 
 
-# views.py
 
-from django.conf import settings
-
-
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
 
 @csrf_exempt
 def create_payment_intent(request):

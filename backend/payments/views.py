@@ -5,6 +5,9 @@ from django.shortcuts import render
 
 from django.shortcuts import render
 from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import stripe
 from .forms import PaymentForm
 import stripe
 
@@ -33,3 +36,47 @@ def payment_view(request):
     else:
         form = PaymentForm()
     return render(request, 'payment.html', {'form': form})
+
+
+
+# views.py
+
+from django.conf import settings
+
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+@csrf_exempt
+def create_payment_intent(request):
+    if request.method == 'POST':
+        amount = request.POST.get('amount')
+        currency = 'usd'  # Set the currency (e.g., USD)
+        
+        try:
+            payment_intent = stripe.PaymentIntent.create(
+                amount=int(amount),
+                currency=currency
+            )
+            return JsonResponse({
+                'clientSecret': payment_intent.client_secret
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@csrf_exempt
+def stripe_webhook(request):
+    # Handle Stripe webhook events here
+    payload = request.body
+    sig_header = request.headers.get('Stripe-Signature', None)
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+        # Handle the event (e.g., update payment status in database)
+        return JsonResponse({'received': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

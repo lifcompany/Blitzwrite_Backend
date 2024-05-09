@@ -165,9 +165,9 @@ class ResetPasswordView(APIView):
         if password == confirm_password:
             user.password = password
             user.save()
-            return Response({"success": "reset password"}, status=status.HTTP_200_OK)
+            return Response({"success": "Reset Password"}, status=status.HTTP_200_OK)
         else:
-            return Response({"error": "password not matched"})
+            return Response({"error": "Password not matched"})
 
 
 class LoginView(APIView):

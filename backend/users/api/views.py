@@ -1,7 +1,7 @@
 import os
 import requests
-from django.contrib.auth import authenticate, login
-from rest_framework import status, permissions
+from django.contrib.auth import authenticate, login, get_user_model
+from rest_framework import status, permissions, generics
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 from rest_framework.response import Response
@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+from allauth.account.models import EmailAddress
 
 from backend.users.models import User
 
@@ -118,6 +119,30 @@ class RegisterView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
+# class GoogleRegister(APIView):
+
+User = get_user_model()
+class GoogleRegister(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer # Create a serializer for user registration
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = self.perform_create(serializer)
+        if user:
+            return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        user.is_active = True  # Activate user upon registration
+        user.save()
+        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)  # Mark email as verified
+        return user
+    
 
 class MailVerifyView(APIView):
     def post(self, request):

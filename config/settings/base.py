@@ -84,6 +84,8 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "drf_spectacular",
     "rest_framework_simplejwt",
+    # Google Oauth
+    "allauth.socialaccount.providers.google",
 ]
 
 LOCAL_APPS = [
@@ -92,6 +94,23 @@ LOCAL_APPS = [
     "backend.output",
     # Your stuff: custom apps go here
 ]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': '412305795434-v38u701gekbk82o0i5eg7bsnjtuqhc1o.apps.googleusercontent.com',
+            'secret': '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',
+            'key': '',
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    }
+}
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -374,3 +393,4 @@ SIMPLE_JWT = {
     # 'REFRESH_TOKEN_BLACKLIST_AFTER_ROTATION': False,
     # 'UPDATE_LAST_LOGIN': False,
 }
+

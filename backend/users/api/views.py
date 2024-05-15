@@ -18,16 +18,17 @@ from .serializers import UserSerializer, LoginSerializer
 def send_mail(email, content):
     email_params = {
         "apikey": os.getenv("MAIL_KEY"),
-        "from": "shiraishi.dev116@gmail.com",
+        "from": "tamuraknight1223@gmail.com",
         "to": email,
         "subject": "Email Verify - lif-post Account",
         "body": f"{content}",
         "isTransactional": True,
     }
-
+    print(email, content, email_params)
     response = requests.post(
         "https://api.elasticemail.com/v2/email/send",
         data=email_params,
+        timeout=30
     )
     return response
 
@@ -54,10 +55,6 @@ class RegisterView(APIView):
     def post(self, request):
         try:
             data = request.data
-            firstName = data["firstName"]
-            lastName = data["lastName"]
-            role = data["user_type"]
-            phoneNumber = data["phoneNumber"]
             email = data["email"]
             password = data["password"]
 
@@ -66,19 +63,15 @@ class RegisterView(APIView):
                     if not User.objects.filter(email=email).exists():
                         user = User.objects.create_user(
                             email=email,
-                            fullname=firstName + " " + lastName,
-                            first_name=firstName,
-                            last_name=lastName,
-                            user_type=role,
-                            phoneNumber=phoneNumber,
                             password=password,
+
                         )
                         if User.objects.filter(email=email).exists():
                             # mail verify
                             refresh = RefreshToken.for_user(user)
                             response = send_mail(
                                 email,
-                                f"{os.getenv('FRONT_URL')}/mail-verify/?token={str(refresh.access_token)}",
+                                f"http://127.0.0.1:3000/mail-verify/?token={str(refresh.access_token)}",
                             )
                             if response.status_code == 200:
                                 return Response(
@@ -146,12 +139,34 @@ class GoogleRegister(generics.CreateAPIView):
 
 class MailVerifyView(APIView):
     def post(self, request):
+        print("user=============>", request.user)
         user = request.user
         user.mail_verify_statu = True
         user.save()
         return Response({"success": "Email verified"}, status=status.HTTP_200_OK)
 
 
+# class MailVerifyView(APIView):
+#     permission_classes = (permissions.AllowAny,)
+
+#     def post(self, request):
+#         serializer = MailVerifySerializer(data=request.data)
+#         if serializer.is_valid():
+#             token = serializer.validated_data['token']
+#             try:
+#                 # refresh = RefreshToken(token)
+#                 user_id = "refresh['user_id']"
+#                 user = User.objects.get(id=user_id)
+#                 print("11111111", user)
+#                 if not user.mail_verify_statu:
+#                     user.mail_verify_statu = True
+#                     user.save()
+#                     return Response({"message": "User successfully verified"}, status=status.HTTP_200_OK)
+#                 else:
+#                     return Response({"message": "User is already verified"}, status=status.HTTP_400_BAD_REQUEST)
+#             except Exception as e:
+#                 return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class ForgetPasswordView(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = ()
@@ -163,7 +178,7 @@ class ForgetPasswordView(APIView):
             refresh = RefreshToken.for_user(user)
             response = send_mail(
                 email,
-                f"{os.getenv('FRONT_URL')}/reset-password/?token={str(refresh.access_token)}",
+                f"http://127.0.0.1:3000/reset-password/?token={str(refresh.access_token)}",
             )
             if response.status_code == 200:
                 return Response(

@@ -16,19 +16,22 @@ from backend.users.models import User
 from .serializers import UserSerializer, LoginSerializer
 
 def send_mail(email, content):
+    print(os.getenv("MAIL_KEY"))
     email_params = {
-        "apikey": os.getenv("MAIL_KEY"),
-        "from": "tamuraknight1223@gmail.com",
-        "to": email,
+        "apikey": "51BE987EAE91BB7F4751EAE6E10333EDB756E112770442B653F86039559A52F1DEBE8C96C6C91A6D72C36C5EBCAE3E9E",
+        "from": "andresimoni1223@gmail.com",
+        "to": "andresimoni1223@gmail.com",
         "subject": "Email Verify - lif-post Account",
         "body": f"{content}",
         "isTransactional": True,
     }
+    headers = {
+        'Content-Type': 'application/json'
+    }
     print(email, content, email_params)
     response = requests.post(
         "https://api.elasticemail.com/v2/email/send",
-        data=email_params,
-        timeout=30
+        params=email_params,
     )
     return response
 
@@ -73,6 +76,7 @@ class RegisterView(APIView):
                                 email,
                                 f"http://127.0.0.1:3000/mail-verify/?token={str(refresh.access_token)}",
                             )
+                            print(response)
                             if response.status_code == 200:
                                 return Response(
                                     {

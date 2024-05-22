@@ -18,7 +18,7 @@ from .serializers import UserSerializer, LoginSerializer
 def send_mail(email, content):
     print(os.getenv("MAIL_KEY"))
     email_params = {
-        "apikey": "51BE987EAE91BB7F4751EAE6E10333EDB756E112770442B653F86039559A52F1DEBE8C96C6C91A6D72C36C5EBCAE3E9E",
+        "apikey": "",
         "from": "andresimoni1223@gmail.com",
         "to": "andresimoni1223@gmail.com",
         "subject": "Email Verify - lif-post Account",

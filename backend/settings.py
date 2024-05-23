@@ -1,7 +1,14 @@
 # settings.py
 
 import os
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Other settings ...
+
+# Add this line to set the directory where files are stored
+FILES_DIRECTORY = os.path.join(BASE_DIR, 'files')
 # Stripe API keys
 STRIPE_SECRET_KEY = 'stripe_test_key'
 STRIPE_PUBLIC_KEY = 'stripe_public_key'

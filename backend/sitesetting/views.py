@@ -233,3 +233,36 @@ def post_article(request):
         return JsonResponse({"error": "Error decoding file. The file may not be in UTF-8 encoding."}, status=500)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+def smart_convert(value):
+    """
+    Try to convert the value to an integer or float. If both conversions fail,
+    return the value as a string.
+
+    Parameters:
+    value (str): The value to be converted.
+
+    Returns:
+    int, float, str: The converted value as an int, float, or str.
+
+    Examples:
+    >>> smart_convert("42")
+    42
+
+    >>> smart_convert("3.14")
+    3.14
+
+    >>> smart_convert("hello")
+    'hello'
+
+    >>> smart_convert("")
+    ''
+    """
+    try:
+        return int(value)
+    except ValueError:
+        try:
+            return float(value)
+        except ValueError:
+            return value

@@ -128,3 +128,25 @@ def delete_model(request):
         return JsonResponse({'error': 'Invalid JSON format'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+def delete_files(request):
+    try:
+        data = json.loads(request.body)
+        filename = data.get('filename')
+
+        if not filename:
+            return JsonResponse({'success': False, 'message': 'Filename not provided'}, status=400)
+
+        # Ensure the files directory is configured in settings
+        files_directory = settings.FILES_DIRECTORY
+        file_path = os.path.join(files_directory, filename)
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return JsonResponse({'success': True, 'message': 'File deleted successfully.'})
+        else:
+            return JsonResponse({'success': False, 'message': 'File not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON format'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)

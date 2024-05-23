@@ -1,11 +1,17 @@
-from django.shortcuts import render
 import os
-from django.http import JsonResponse
+import json
+import re
+import gspread
 from django.shortcuts import render
+from django.http import JsonResponse
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from oauth2client.service_account import ServiceAccountCredentials
+from wordpress_xmlrpc import Client, WordPressPost
+from wordpress_xmlrpc.methods import posts
+from django.views.decorators.http import require_GET
+from django.utils.decorators import method_decorator
 from .models import LifVersion
-import json
 
 def get_file_list(request):
     directory = './result'
@@ -150,3 +156,80 @@ def delete_files(request):
         return JsonResponse({'success': False, 'message': 'Invalid JSON format'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    
+def get_file_content(request):
+    file_name = request.GET.get('file_name')
+    result_folder = './result'  # You might want to set this in your settings file
+
+    if not file_name:
+        return JsonResponse({"error": "file_name parameter is required"}, status=400)
+
+    file_path = os.path.join(result_folder, file_name)
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+        return JsonResponse({"content": content})
+    except FileNotFoundError:
+        return JsonResponse({"error": "File not found"}, status=404)
+    except UnicodeDecodeError:
+        return JsonResponse({"error": "Error decoding file. The file may not be in UTF-8 encoding."}, status=500)
+    
+@method_decorator(csrf_exempt, name='dispatch')
+@require_GET
+def post_article(request):
+    try:
+        # Initialize Google Sheets
+        gc = gspread.service_account(filename=settings.GOOGLE_SHEETS_CREDENTIALS)
+        spreadsheet = gc.open('lifGPT')
+        themesheet = spreadsheet.get_worksheet(0)
+        sitesheet = spreadsheet.worksheet('サイト')
+
+        file_name = request.GET.get('file_name')
+        result_folder = settings.RESULT_FOLDER
+        file_path = os.path.join(result_folder, file_name)
+
+        with open(file_path, 'r', encoding='utf-8') as file:
+            file_content = file.read()
+            match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+            if match:
+                extracted_part = match.group(0)
+                file_content = file_content.replace(extracted_part, '').strip()
+                file_content = extracted_part + '\n' + file_content
+                file_content = file_content.replace('★ーーー★', '')
+
+        with open(settings.OUTPUT_JSON_PATH, 'r', encoding='utf-8') as file:
+            json_data = json.load(file)
+
+        site_url, wp_username, wp_password, category = None, None, None, None
+        for matching_data in json_data:
+            if file_name == matching_data['file_name']:
+                site_name = matching_data['site_name']
+                category = matching_data['category']
+                for row in sitesheet.get_all_values()[1:]:
+                    if site_name == row[0]:
+                        site_url = row[1]
+                        wp_username = row[2]
+                        wp_password = row[3]
+                        break
+
+        if not (site_url and wp_username and wp_password and category):
+            return JsonResponse({"error": "Matching data not found or incomplete"}, status=404)
+
+        wp_url = f"{site_url}/xmlrpc.php"
+        wp_client = Client(wp_url, wp_username, wp_password)
+
+        post = WordPressPost()
+        post.title = '仮記事(新着)'
+        post.content = file_content
+        post.terms_names = {'category': [category]}
+        post.post_status = 'publish'
+
+        wp_client.call(posts.NewPost(post))
+        return JsonResponse({"message": "completed"}, status=200)
+    except FileNotFoundError:
+        return JsonResponse({"error": "File not found"}, status=404)
+    except UnicodeDecodeError:
+        return JsonResponse({"error": "Error decoding file. The file may not be in UTF-8 encoding."}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

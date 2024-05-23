@@ -92,6 +92,8 @@ LOCAL_APPS = [
     "backend.users",
     "backend.payments",
     "backend.output",
+    "backend.sitesetting"
+
     # Your stuff: custom apps go here
 ]
 

@@ -4,7 +4,6 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from .forms import PaymentForm
 from .models import LifVersion
 
 def get_file_list(request):
@@ -16,14 +15,15 @@ def get_file_list(request):
 
 def get_model_list(request):
     models = LifVersion.objects.all()
-    
     model_list = []
     for model in models:
         model_dict = {
             'id': model.id,
-            'name': model.name,  # replace 'name' with the actual field names in your model
-            # Add other fields as needed
+            'display_name': model.display_name,
+            'model_name': model.model_name,
+            'endpoint': model.endpoint,
+            'params': model.params,
         }
         model_list.append(model_dict)
-
+    
     return JsonResponse(model_list, safe=False)

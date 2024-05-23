@@ -1,5 +1,10 @@
 from django.db import models
 
-# Create your models here.
 class LifVersion(models.Model):
-    name = models.CharField(max_length=100)
+    display_name = models.CharField(max_length=100)
+    model_name = models.CharField(max_length=100)
+    endpoint = models.URLField()
+    params = models.TextField()
+
+    def __str__(self):
+        return self.display_name

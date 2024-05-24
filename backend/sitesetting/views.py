@@ -103,7 +103,7 @@ def add_new_version(request):
             endpoint = data['endpoint']
             params = data['params']
 
-            if not all([model_name, endpoint, params]):
+            if not all([model_name, endpoint]):
                 return JsonResponse({'error': 'Missing required data'}, status=400)
             
             try:
@@ -160,31 +160,74 @@ def add_new_version(request):
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
+@csrf_exempt 
+def update_model(request):
+    if request.method == 'POST':
+        try:
+            data = JSONParser().parse(request)
+            model_name = data['model_name']
+            endpoint = data['endpoint']
+            params = data['params']
 
-def get_edit_version(request):
-    try:
-        data = json.loads(request.body)
-        model_id = data.get('editversionID')
-
-        if model_id:
+            if not all([model_name, endpoint]):
+                return JsonResponse({'error': 'Missing required data'}, status=400)
+            
             try:
-                model_version = LifVersion.objects.get(id=model_id)
-                model_data = {
-                    "display_name": model_version.display_name,
-                    "model_name": model_version.model_name,
-                    "endpoint": model_version.endpoint,
-                    "params": model_version.params,
-                }
-                return JsonResponse(model_data, status=200)
+                model_version = LifVersion.objects.get(model_name=model_name)
+                model_version.endpoint = endpoint
+                model_version.params = params
+                model_version.save()
+                message = "Model updated successfully"
+
             except LifVersion.DoesNotExist:
-                return JsonResponse({'error': 'Model version not found'}, status=404)
-        else:
-            return JsonResponse({'error': 'Invalid editversionID format'}, status=400)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON format'}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
+                # Create new model version
+                LifVersion.objects.create(
+                    model_name=model_name,
+                    endpoint=endpoint,
+                    params=params
+                )
+                message = "Model added successfully"
+            return JsonResponse({'message': message}, status=201)
+
+        except KeyError as e:
+
+            return JsonResponse({'error': f"Missing data: {str(e)}"}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+        except Exception as e:
+            print("This is add new version")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+@csrf_exempt 
+def get_edit_version(request):
+    if request.method == 'POST':
+        try:
+            data = JSONParser().parse(request)
+            editModelName = data['editModalName']
+            print(editModelName)
+
+
+            if editModelName:
+                try:
+                    edit_model = LifVersion.objects.get(model_name=editModelName)
+                    model_data = {
+                        "display_name": edit_model.display_name,
+                        "model_name": edit_model.model_name,
+                        "endpoint": edit_model.endpoint,
+                        "params": edit_model.params,
+                    }
+                    return JsonResponse(model_data, status=200)
+                except LifVersion.DoesNotExist:
+                    return JsonResponse({'error': 'Model version not found'}, status=404)
+            else:
+                return JsonResponse({'error': 'Invalid editversionID format'}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
 @csrf_exempt 
 def delete_model(request):
     try:

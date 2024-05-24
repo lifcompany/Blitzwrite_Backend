@@ -492,3 +492,56 @@ def download_text_file(request, filename):
         return FileResponse(open(filepath, 'rb'), as_attachment=True)
     else:
         raise Http404("File not found")
+    
+def save_wpsite(request):
+    try:
+        data = json.loads(request.body)
+
+        site_name = data.get('site_name')
+        site_url = data['site_url']
+        admin_name = data['admin_name']
+        admin_pass = data['admin_pass']
+
+        if editversionID:
+            try:
+                model_version = LifVersion.objects.get(id=editversionID)
+            except LifVersion.DoesNotExist:
+                return JsonResponse({'error': 'Model version not found'}, status=404)
+
+            # Check for uniqueness constraints
+            if LifVersion.objects.exclude(id=editversionID).filter(display_name=display_name).exists():
+                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
+            if LifVersion.objects.exclude(id=editversionID).filter(model_name=model_name).exists():
+                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
+
+            # Update existing model version
+            model_version.display_name = display_name
+            model_version.model_name = model_name
+            model_version.endpoint = endpoint
+            model_version.params = params
+            model_version.save()
+            message = "Model updated successfully"
+        else:
+            # Check for uniqueness constraints
+            if LifVersion.objects.filter(display_name=display_name).exists():
+                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
+            if LifVersion.objects.filter(model_name=model_name).exists():
+                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
+
+            # Create new model version
+            LifVersion.objects.create(
+                display_name=display_name,
+                model_name=model_name,
+                endpoint=endpoint,
+                params=params
+            )
+            message = "Model added successfully"
+
+        return JsonResponse({'message': message}, status=201)
+
+    except KeyError as e:
+        return JsonResponse({'error': f"Missing data: {str(e)}"}, status=400)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -1,7 +1,7 @@
 # urls.py
 
 from django.urls import path
-from .views import get_file_list, get_model_list, add_new_version, get_edit_version, delete_model, delete_files, get_file_content, post_article
+from .views import get_file_list, get_model_list, add_new_version, get_edit_version, delete_model, delete_files, get_file_content, post_article, run_script, stop_script
 
 
 urlpatterns = [
@@ -13,4 +13,6 @@ urlpatterns = [
     path('delete_files/', delete_files, name='delete_files'),
     path('get_file_content/', get_file_content, name='get_file_content'),
     path('post_article/', post_article, name='post_article'),
+    path('run_script/', run_script, name='run_script'),
+    path('stop_script/', stop_script, name='stop_script'),
 ]

@@ -1,9 +1,11 @@
 import os
 import json
 import re
+import datetime
 import gspread
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
+from openai import OpenAI
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from oauth2client.service_account import ServiceAccountCredentials
@@ -12,6 +14,17 @@ from wordpress_xmlrpc.methods import posts
 from django.views.decorators.http import require_GET
 from django.utils.decorators import method_decorator
 from .models import LifVersion
+
+from django.views.decorators.http import require_http_methods
+
+class Base:
+    stop_execution = False
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
+print(settings.OPENAI_API_KEY)
+print(settings.BASE_DIR)
+
+
 
 def get_file_list(request):
     directory = './result'
@@ -36,8 +49,8 @@ def get_model_list(request):
     return JsonResponse(model_list, safe=False)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-@require_POST
+# @method_decorator(csrf_exempt, name='dispatch')
+# @require_POST
 def add_new_version(request):
     try:
         data = json.loads(request.body)
@@ -266,3 +279,216 @@ def smart_convert(value):
             return float(value)
         except ValueError:
             return value
+        
+
+# def post_article(new_data):
+#     gc = gspread.service_account(filename='cred.json')
+#     spreadsheet = gc.open('lifGPT')  
+#     themesheet = spreadsheet.get_worksheet(0) 
+#     sitesheet = spreadsheet.worksheet('サイト') 
+
+#     file_name =new_data['file_name']            
+#     print(file_name)
+#     result_folder = './result'
+#     file_path = os.path.join(result_folder, file_name)
+#     with open(file_path, 'r', encoding='utf-8') as file:
+#         file_content = file.read()
+#         match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+#         if match:
+#             extracted_part = match.group(0)
+#             file_content = file_content.replace(extracted_part, '').strip()
+#             file_content = extracted_part + '\n' + file_content
+#             file_content = file_content.replace('★ーーー★', '')
+
+#     site_name = new_data['site_name']
+#     category = new_data['category']
+#     for row in sitesheet.get_all_values()[1:]:
+#         if site_name == row[0]:
+#             site_url=row[1]
+#             id = row[2]
+#             password = row[3]
+#             wp_url = f"{site_url}/xmlrpc.php"
+#             wp_username = id
+#             wp_password = password
+#             wp_client = Client(wp_url, wp_username, wp_password)
+
+#             post = WordPressPost()
+#             post.title = '仮記事(新着)'
+#             post.content = file_content
+#             post.terms_names = {
+#             'category': [category]
+#             }
+#             post.post_status = 'draft'
+
+#             wp_client.call(posts.NewPost(post))
+#             worksheet.update('B' + str(row_number), formatted_datetime)
+#             print("completed")
+#     return "completed"
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+def run_script(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        version_id = data.get('versionId')
+        if version_id:
+            try:
+                model = LifVersion.objects.get(id=version_id)
+            except LifVersion.DoesNotExist:
+                return JsonResponse({'error': 'Invalid versionId'}, status=400)
+
+            display_name = model.display_name
+            model_name = model.model_name
+            endpoint = model.endpoint
+            params = model.params
+            param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
+
+            parameters = {}
+            for line in param_lines:
+                key, value = line.split('=')
+                parameters[key.strip()] = value.strip()
+
+            parameters = {k: smart_convert(v) for k, v in parameters.items()}
+            if not params and endpoint == "https://api.openai.com/v1/chat/completions":
+                parameters = {
+                    "temperature": 0.2,
+                    "max_tokens": 500,
+                    "frequency_penalty": 0.0,
+                    'timeout': 1200
+                }
+
+            # Google Sheets and external API processing
+            scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+            creds = ServiceAccountCredentials.from_service_account_file('cred.json', scopes=scope)
+            gc = gspread.service_account(filename='cred.json')
+            spreadsheet = gc.open('lifGPT')
+            worksheet = spreadsheet.get_worksheet(0)
+
+            def process_bbb_data():
+                bbb_ws = spreadsheet.worksheet('プロンプト')
+                results = [row[0] for row in bbb_ws.get_all_values() if row[0]]
+                return results
+
+            bbb_results = process_bbb_data()
+            print(bbb_results)
+            responses = []
+            response = None
+            new_file_list = []
+            filename = 'output.json'
+            match_results = []
+
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    match_results = json.load(file)
+
+            for row_number, row in enumerate(worksheet.get_all_values()[1:], start=2):
+                text_a = row[0]
+                status_c = row[1]
+                site_name = row[2]
+                category = row[3]
+                if not status_c:
+                    current_time = datetime.datetime.now()
+                    run_directory_datetime = current_time.strftime("%Y-%m-%d-%H-%M-%S")
+                    formatted_datetime = current_time.strftime("%Y/%m/%d-%H:%M")
+
+                    responses = []
+                    conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
+                    for row, text_prompt in enumerate(bbb_results, start=1):
+                        if text_a and "〇〇〇〇" in text_prompt:
+                            text_prompt = text_prompt.replace("〇〇〇〇", text_a)
+                        else:
+                            text_prompt = f"「{text_a}」 {text_prompt}"
+
+                        if endpoint == "https://api.openai.com/v1/chat/completions":
+                            conversation_history.append({"role": "user", "content": text_prompt})
+                        else:
+                            conversation_history = text_prompt
+
+                        if endpoint == "https://api.openai.com/v1/chat/completions":
+                            response = client.chat.completions.create(
+                                model=f"{model_name}",
+                                messages=conversation_history,
+                                **parameters
+                            )
+                            responses.append(response.choices[0].message.content.strip())
+                        else:
+                            response = client.completions.create(
+                                model=f"{model_name}",
+                                prompt=conversation_history,
+                                **parameters
+                            )
+                            responses.append(response.choices[0].text.strip())
+
+                    with open(f'./result/{run_directory_datetime}.txt', 'w', encoding='utf-8') as file:
+                        file.write('\n'.join(responses))
+                    new_data = {
+                        "file_name": f'{run_directory_datetime}.txt',
+                        "site_name": site_name,
+                        "category": category
+                    }
+                    match_results.append(new_data)
+                    new_file_list.append(f'{run_directory_datetime}.txt')
+
+                    def post_article(new_data):
+                        gc = gspread.service_account(filename='cred.json')
+                        spreadsheet = gc.open('lifGPT')  
+                        sitesheet = spreadsheet.worksheet('サイト') 
+                        site_name = new_data['site_name']
+                        category = new_data['category']
+                        for row in sitesheet.get_all_values()[1:]:
+                            if site_name == row[0]:
+                                site_url = row[1]
+                                wp_username = row[2]
+                                wp_password = row[3]
+                                wp_url = f"{site_url}/xmlrpc.php"
+                                wp_client = Client(wp_url, wp_username, wp_password)
+
+                                file_name = new_data['file_name']
+                                file_path = os.path.join('./result', file_name)
+                                with open(file_path, 'r', encoding='utf-8') as file:
+                                    file_content = file.read()
+                                    match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+                                    if match:
+                                        extracted_part = match.group(0)
+                                        file_content = file_content.replace(extracted_part, '').strip()
+                                        file_content = extracted_part + '\n' + file_content
+                                        file_content = file_content.replace('★ーーー★', '')
+
+                                post = WordPressPost()
+                                post.title = '仮記事(新着)'
+                                post.content = file_content
+                                post.terms_names = {
+                                    'category': [category]
+                                }
+                                post.post_status = 'draft'
+                                wp_client.call(posts.NewPost(post))
+                                worksheet.update('B' + str(row_number), formatted_datetime)
+                                return "completed"
+
+                    post_article(new_data)
+
+            data = {
+                'status': "completed",
+                'list': new_file_list
+            }
+            return JsonResponse(data)
+
+        else:
+            return JsonResponse({'error': 'Invalid versionId format'}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@method_decorator(csrf_exempt, name='dispatch')
+def stop_script(request):
+    if request.method == 'POST':
+        Base.stop_execution = True
+        return JsonResponse({"message": "Stopped"})
+    return JsonResponse({"error": "Invalid request method"}, status=400)
+
+def download_text_file(request, filename):
+    directory = os.path.join(settings.BASE_DIR, 'result')  # Adjust as needed
+    filepath = os.path.join(directory, filename)
+
+    if os.path.isfile(filepath):
+        return FileResponse(open(filepath, 'rb'), as_attachment=True)
+    else:
+        raise Http404("File not found")

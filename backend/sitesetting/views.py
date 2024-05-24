@@ -3,17 +3,21 @@ import json
 import re
 import datetime
 import gspread
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import FileResponse, Http404, JsonResponse
+from rest_framework.parsers import JSONParser
+from rest_framework.views import APIView
 from openai import OpenAI
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from oauth2client.service_account import ServiceAccountCredentials
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods import posts
-from django.views.decorators.http import require_GET
 from django.utils.decorators import method_decorator
-from .models import LifVersion
+
+from .models import LifVersion, SiteData
+from .serializers import SiteDataSerializer, LifVersionSerializer
 
 from django.views.decorators.http import require_http_methods
 
@@ -49,61 +53,113 @@ def get_model_list(request):
     return JsonResponse(model_list, safe=False)
 
 
+
 # @method_decorator(csrf_exempt, name='dispatch')
 # @require_POST
+
+class AddNewVersionView(APIView):
+    def post(self, request):
+        data = JSONParser().parse(request)
+        editversion_id = data.get('editversionID')
+        display_name = data.get('display_name')
+        model_name = data.get('model_name')
+
+        if not display_name or not model_name or not data.get('endpoint') or not data.get('params'):
+            return JsonResponse({"error": "Missing data"}, status=400)
+
+        try:
+            if editversion_id:
+                lif_version = get_object_or_404(LifVersion, id=editversion_id)
+                if (LifVersion.objects.filter(display_name=display_name).exclude(id=editversion_id).exists() or
+                        LifVersion.objects.filter(model_name=model_name).exclude(id=editversion_id).exists()):
+                    return JsonResponse({"error": "A model with the same display name or model name already exists."}, status=409)
+                
+                serializer = LifVersionSerializer(lif_version, data=data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return JsonResponse({"message": "Model updated successfully"}, status=200)
+                return JsonResponse(serializer.errors, status=400)
+            else:
+                if LifVersion.objects.filter(display_name=display_name).exists() or LifVersion.objects.filter(model_name=model_name).exists():
+                    return JsonResponse({"error": "A model with the same display name or model name already exists."}, status=409)
+                
+                serializer = LifVersionSerializer(data=data)
+                if serializer.is_valid():
+                    serializer.save()
+                    return JsonResponse({"message": "Model added successfully"}, status=201)
+                return JsonResponse(serializer.errors, status=400)
+        
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+        
+
+
+@csrf_exempt 
 def add_new_version(request):
-    try:
-        data = json.loads(request.body)
+    if request.method == 'POST':
+        try:
+            data = JSONParser().parse(request)
+            model_name = data['model_name']
+            endpoint = data['endpoint']
+            params = data['params']
 
-        editversionID = data.get('editversionID')
-        display_name = data['display_name']
-        model_name = data['model_name']
-        endpoint = data['endpoint']
-        params = data['params']
-
-        if editversionID:
+            if not all([model_name, endpoint, params]):
+                return JsonResponse({'error': 'Missing required data'}, status=400)
+            
             try:
-                model_version = LifVersion.objects.get(id=editversionID)
+                model_version = LifVersion.objects.get(model_name=model_name)
+                model_version.endpoint = endpoint
+                model_version.params = params
+                model_version.save()
+                message = "Model updated successfully"
+
             except LifVersion.DoesNotExist:
-                return JsonResponse({'error': 'Model version not found'}, status=404)
+                # Create new model version
+                LifVersion.objects.create(
+                    model_name=model_name,
+                    endpoint=endpoint,
+                    params=params
+                )
+                message = "Model added successfully"
 
-            # Check for uniqueness constraints
-            if LifVersion.objects.exclude(id=editversionID).filter(display_name=display_name).exists():
-                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
-            if LifVersion.objects.exclude(id=editversionID).filter(model_name=model_name).exists():
-                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
 
-            # Update existing model version
-            model_version.display_name = display_name
-            model_version.model_name = model_name
-            model_version.endpoint = endpoint
-            model_version.params = params
-            model_version.save()
-            message = "Model updated successfully"
-        else:
-            # Check for uniqueness constraints
-            if LifVersion.objects.filter(display_name=display_name).exists():
-                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
-            if LifVersion.objects.filter(model_name=model_name).exists():
-                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
+            # if model_name:
+            #     try:
+            #         model_version = LifVersion.objects.get(model_name = model_name)
+            #     except LifVersion.DoesNotExist:
+            #         return JsonResponse({'error': 'Model version not found'}, status=404)
 
-            # Create new model version
-            LifVersion.objects.create(
-                display_name=display_name,
-                model_name=model_name,
-                endpoint=endpoint,
-                params=params
-            )
-            message = "Model added successfully"
+            #     # Update existing model version
+            #     model_version.model_name = model_name
+            #     model_version.endpoint = endpoint
+            #     model_version.params = params
+            #     model_version.save()
+            #     message = "Model updated successfully"
+            # else:
 
-        return JsonResponse({'message': message}, status=201)
+            #     if LifVersion.objects.filter(model_name=model_name).exists():
+            #         return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
 
-    except KeyError as e:
-        return JsonResponse({'error': f"Missing data: {str(e)}"}, status=400)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON format'}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+            #     # Create new model version
+            #     LifVersion.objects.create(
+            #         model_name=model_name,
+            #         endpoint=endpoint,
+            #         params=params
+            #     )
+            #     message = "Model added successfully"
+
+            return JsonResponse({'message': message}, status=201)
+
+        except KeyError as e:
+
+            return JsonResponse({'error': f"Missing data: {str(e)}"}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+        except Exception as e:
+            print("This is add new version")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
 
 def get_edit_version(request):
     try:
@@ -129,11 +185,11 @@ def get_edit_version(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+@csrf_exempt 
 def delete_model(request):
     try:
         data = json.loads(request.body)
         delete_model_id = data.get('id')
-
         if delete_model_id:
             try:
                 model_version = LifVersion.objects.get(id=delete_model_id)
@@ -493,55 +549,13 @@ def download_text_file(request, filename):
     else:
         raise Http404("File not found")
     
-def save_wpsite(request):
-    try:
-        data = json.loads(request.body)
-
-        site_name = data.get('site_name')
-        site_url = data['site_url']
-        admin_name = data['admin_name']
-        admin_pass = data['admin_pass']
-
-        if editversionID:
-            try:
-                model_version = LifVersion.objects.get(id=editversionID)
-            except LifVersion.DoesNotExist:
-                return JsonResponse({'error': 'Model version not found'}, status=404)
-
-            # Check for uniqueness constraints
-            if LifVersion.objects.exclude(id=editversionID).filter(display_name=display_name).exists():
-                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
-            if LifVersion.objects.exclude(id=editversionID).filter(model_name=model_name).exists():
-                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
-
-            # Update existing model version
-            model_version.display_name = display_name
-            model_version.model_name = model_name
-            model_version.endpoint = endpoint
-            model_version.params = params
-            model_version.save()
-            message = "Model updated successfully"
-        else:
-            # Check for uniqueness constraints
-            if LifVersion.objects.filter(display_name=display_name).exists():
-                return JsonResponse({'error': 'A model with the same display name already exists.'}, status=409)
-            if LifVersion.objects.filter(model_name=model_name).exists():
-                return JsonResponse({'error': 'A model with the same model name already exists.'}, status=409)
-
-            # Create new model version
-            LifVersion.objects.create(
-                display_name=display_name,
-                model_name=model_name,
-                endpoint=endpoint,
-                params=params
-            )
-            message = "Model added successfully"
-
-        return JsonResponse({'message': message}, status=201)
-
-    except KeyError as e:
-        return JsonResponse({'error': f"Missing data: {str(e)}"}, status=400)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON format'}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+@csrf_exempt
+def set_site(request):
+    if request.method == 'POST':
+        data = JSONParser().parse(request)
+        serializer = SiteDataSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
+    return JsonResponse({"error": "Invalid request method"}, status=405)

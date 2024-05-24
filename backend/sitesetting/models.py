@@ -8,11 +8,12 @@ class LifVersion(models.Model):
 
     def __str__(self):
         return self.display_name
-class WPSite(models.Model):
-    site_name = models.CharField(max_length=100)
-    site_url = models.URLField()
-    admin_name = models.CharField(max_length=100)
-    admin_pass = models.CharField(max_length=100)
+
+class SiteData(models.Model):
+    site_name = models.CharField(max_length=255)
+    site_url = models.URLField(max_length=200)
+    admin_name = models.CharField(max_length=255)
+    admin_pass = models.CharField(max_length=255)
 
     def __str__(self):
         return self.site_name

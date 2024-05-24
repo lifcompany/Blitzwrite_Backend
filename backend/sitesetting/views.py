@@ -231,11 +231,11 @@ def get_edit_version(request):
 @csrf_exempt 
 def delete_model(request):
     try:
-        data = json.loads(request.body)
-        delete_model_id = data.get('id')
-        if delete_model_id:
+        data = JSONParser().parse(request)
+        delete_model_name = data['model_name']
+        if delete_model_name:
             try:
-                model_version = LifVersion.objects.get(id=delete_model_id)
+                model_version = LifVersion.objects.get(model_name=delete_model_name)
                 model_version.delete()
                 return JsonResponse({"success": "Document deleted"}, status=200)
             except LifVersion.DoesNotExist:

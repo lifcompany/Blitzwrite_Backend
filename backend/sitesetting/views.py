@@ -3,6 +3,7 @@ import json
 import re
 import datetime
 import gspread
+import stripe
 from django.shortcuts import render, get_object_or_404
 from django.http import FileResponse, Http404, JsonResponse
 from rest_framework.parsers import JSONParser
@@ -602,3 +603,54 @@ def set_site(request):
             return JsonResponse(serializer.data, status=201)
         return JsonResponse(serializer.errors, status=400)
     return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
+
+@csrf_exempt
+def create_payment_intent(request):
+    if request.method == 'POST':
+        try:
+            # data = json.loads(request.body)
+            # amount = data['amount']
+            intent = stripe.PaymentIntent.create(
+                amount=1000,
+                currency='usd',
+            )
+            return JsonResponse({'clientSecret': intent['client_secret']})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=403)
+    else:
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+    
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
+@api_view(['POST'])
+def stripe_webhook(request):
+    payload = request.body
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    endpoint_secret = 'whsec_...'  # Your webhook secret
+    event = None
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return Response(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return Response(status=400)
+
+    # Handle the checkout.session.completed event
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']  # contains a stripe.PaymentIntent
+        # Then define and call a method to handle the successful payment intent.
+        # handle_payment_intent_succeeded(payment_intent)
+
+    return Response(status=200)

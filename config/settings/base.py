@@ -345,6 +345,9 @@ SOCIALACCOUNT_ADAPTER = "backend.users.adapters.SocialAccountAdapter"
 # https://docs.allauth.org/en/latest/socialaccount/configuration.html
 SOCIALACCOUNT_FORMS = {"signup": "backend.users.forms.UserSocialSignupForm"}
 
+
+STRIPE_TEST_PUBLIC_KEY = 'pk_test_51PJzVRFkGHQ8A45rGz0RQ4kWXXo9Ddq82YWhZohEWAvcmLLQvaMykZLGJaHxKgfLOmY6n3X8a2f6mU3dzW7HoAUx00NRu1DK1V'
+STRIPE_TEST_SECRET_KEY = 'sk_test_51PJzVRFkGHQ8A45rDNhL3H8K0gFm4ySLsPkI5Li4qDSkQuMGnBg5O08j30LnzTp1v3CwrC6URH7fGdD0QvESKPgk00nHqRCDyL'
 # django-rest-framework
 # -------------------------------------------------------------------------------
 # django-rest-framework - https://www.django-rest-framework.org/api-guide/settings/

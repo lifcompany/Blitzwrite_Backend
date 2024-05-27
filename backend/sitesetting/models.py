@@ -17,3 +17,10 @@ class SiteData(models.Model):
 
     def __str__(self):
         return self.site_name
+    
+class Product(models.Model):
+    name = models.CharField(max_length=100)
+    price = models.IntegerField()  # Price in cents
+
+    def __str__(self):
+        return self.name

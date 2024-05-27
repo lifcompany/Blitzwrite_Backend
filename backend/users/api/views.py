@@ -218,14 +218,20 @@ class LoginView(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = ()
 
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
+        data = request.data
+
+        print("userValid=====>",serializer.is_valid())
+
         if serializer.is_valid():
             print("user validated ------------------------>", serializer.validated_data)
             email = serializer.validated_data["email"]
             password = serializer.validated_data["password"]
+            print("user Validate data ------------------------>", email, password)
             user = authenticate(request, email=email, password=password)
-            print("user=====>", user)
+            print("userEmailAddress=====>", user)
             if user is not None:
                 if user.mail_verify_statu:
                     login(request, user)
@@ -239,7 +245,6 @@ class LoginView(APIView):
                             "result": {
                                 "token": str(refresh.access_token),
                                 "user": {
-                                    "username": user.first_name,
                                     "email": user.email,
                                     "permission": user.user_type,
                                     # Include any other user fields as needed

@@ -80,33 +80,33 @@ class RegisterView(APIView):
                             if response.status_code == 200:
                                 return Response(
                                     {
-                                        "success": "User created successfully and sent verification link."
+                                        "success": "ユーザーが正常に新規登録され、認証リンクが送信されました。"
                                     },
                                     status=status.HTTP_201_CREATED,
                                 )
                             else:
                                 return Response(
-                                    {"success": "Resend verification link."},
+                                    {"success": "認証リンクを再送する。"},
                                     status=status.HTTP_201_CREATED,
                                 )
                         else:
                             return Response(
-                                {"error": "Something went wrong creating user"},
+                                {"error": "ユーザーの作成に失敗しました"},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             )
                     else:
                         return Response(
-                            {"error": "Username already exists"},
+                            {"error": "ユーザーメールアドレスが既に存在する"},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
                 else:
                     return Response(
-                        {"error": "Password must be at least 6 characters long"},
+                        {"error": "パスワードは8文字以上"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
             else:
                 return Response(
-                    {"error": "Passwords do not match"},
+                    {"error": "パスワードが一致しない"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         except Exception as e:
@@ -129,7 +129,7 @@ class GoogleRegister(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = self.perform_create(serializer)
         if user:
-            return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
+            return Response({'message': 'ユーザー登録成功'}, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -186,7 +186,7 @@ class ForgetPasswordView(APIView):
             )
             if response.status_code == 200:
                 return Response(
-                    {"success": "sent verification link."},
+                    {"success": "認証リンクが送信されました。"},
                     status=status.HTTP_201_CREATED,
                 )
             else:
@@ -197,7 +197,7 @@ class ForgetPasswordView(APIView):
         except Exception as e:
             print(e)
             return Response(
-                {"error": "user does not exist"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "ユーザーが存在しない"}, status=status.HTTP_400_BAD_REQUEST
             )
 
 
@@ -240,7 +240,7 @@ class LoginView(APIView):
                         {
                             "status": {
                                 "type": "success",
-                                "message": "Welcome back! You have successfully logged in.",
+                                "message": "おかえりなさい！ログインに成功しました。",
                             },
                             "result": {
                                 "token": str(refresh.access_token),
@@ -263,7 +263,7 @@ class LoginView(APIView):
             else:
                 return Response(
                     {
-                        "error": "Invalid email or password",
+                        "error": "無効な電子メールまたはパスワード",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -294,7 +294,7 @@ class GetUserView(APIView):
             )
         else:
             return Response(
-                {"error": "User does not exist. Please login"},
+                {"error": "ユーザーが存在しません。ログインしてください。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -327,4 +327,4 @@ class loginWithGoogle(APIView):
             user.mail_verify = True
             user.save()
 
-        return Response("User saved successfully", status=status.HTTP_200_OK)
+        return Response("ユーザー登録成功", status=status.HTTP_200_OK)

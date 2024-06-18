@@ -206,6 +206,7 @@ class ResetPasswordView(APIView):
         user = request.user
         password = request.data["password"]
         confirm_password = request.data["confirmPassword"]
+        print("2323423",confirm_password)
         if password == confirm_password:
             user.password = password
             user.save()

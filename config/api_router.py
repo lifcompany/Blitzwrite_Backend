@@ -16,7 +16,8 @@ sub_urls = [
     path('authentication/', include('users.api.urls')),
     path('core/', include('core.urls')),
     path('setting/', include('sitesetting.urls')),
-    path('seo/', include('seo.urls')),
+    path('generate/', include('seo_article.urls')),
+    path('explorer/', include('explorer.urls'))
 ]
 
 app_name = "api"

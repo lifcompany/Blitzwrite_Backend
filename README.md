@@ -1,88 +1,77 @@
-# backend
+# [Service Name] - Automated Media Content Creation and Upload
 
-Behold My Awesome Project!
+## Overview
 
-[![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[Service Name] is a solution designed to address the challenges of running a media site without incurring high costs for article writing and lacking SEO expertise. The primary target users are individuals looking to launch their own media sites, SEO affiliates, and media management agencies.
 
-License: BSD
+## Key Features
 
-## Settings
+- **Generate Articles with ChatGPT**: Create comprehensive articles using ChatGPT based on provided outlines.
+- **Automatic WordPress Upload**: Seamlessly upload generated articles to WordPress media sites.
 
-Moved to [settings](http://cookiecutter-django.readthedocs.io/en/latest/settings.html).
+## Target Audience
 
-## Basic Commands
+- Individuals looking to start an owned media site
+- SEO affiliates
+- Media management agencies
 
-### Setting Up Your Users
+## Background
 
-- To create a **normal user account**, just go to Sign Up and fill out the form. Once you submit it, you'll see a "Verify Your E-mail Address" page. Go to your console to see a simulated email verification message. Copy the link into your browser. Now the user's email should be verified and ready to go.
+Initially intended for internal use, we recognized the potential of this product and decided to update it for external users.
 
-- To create a **superuser account**, use this command:
+## Scope
 
-      $ python manage.py createsuperuser
+This PRD covers our objectives for 2024. Our goals for 2024 include releasing the product and achieving a target number of paid subscribers (XX). All features listed in the Function Spec are aimed to be implemented. The scope will be updated as needed.
 
-For convenience, you can keep your normal user logged in on Chrome and your superuser logged in on Firefox (or similar), so that you can see how the site behaves for both kinds of users.
+## Installation
 
-### Type checks
+1. **Clone the repository:**
+    ```bash
+    git clone https://github.com/lifcompany/Blitzwrite_Backend.git
+    cd Blitzwrite_Backend
+    ```
 
-Running type checks with mypy:
+2. **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-    $ mypy backend
+3. **Set up environment variables:**
+    Create a `.env` file in the root directory and add the following variables:
+    ```
+    CHATGPT_API_KEY=your_chatgpt_api_key
+    WORDPRESS_API_URL=your_wordpress_site_url
+    WORDPRESS_USERNAME=your_wordpress_username
+    WORDPRESS_PASSWORD=your_wordpress_password
+    ```
 
-### Test coverage
+4. **Run the application:**
+    ```bash
+    npm start
+    ```
 
-To run the tests, check your test coverage, and generate an HTML coverage report:
+## Usage
 
-    $ coverage run -m pytest
-    $ coverage html
-    $ open htmlcov/index.html
+1. **Generate an Article:**
+    - Navigate to the article generation page.
+    - Provide an outline for the article.
+    - Click on the 'Generate' button to create the article using ChatGPT.
 
-#### Running tests with pytest
+2. **Upload to WordPress:**
+    - After generating the article, click on the 'Upload' button to automatically upload it to your WordPress site.
 
-    $ pytest
+## Contributing
 
-### Live reloading and Sass CSS compilation
+We welcome contributions from the community. Please follow these steps to contribute:
 
-Moved to [Live reloading and SASS compilation](https://cookiecutter-django.readthedocs.io/en/latest/developing-locally.html#sass-compilation-live-reloading).
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature/your-feature-name`).
+3. Commit your changes (`git commit -m 'Add some feature'`).
+4. Push to the branch (`git push origin feature/your-feature-name`).
+5. Open a pull request.
 
-### Celery
+## License
 
-This app comes with Celery.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-To run a celery worker:
-
-```bash
-cd backend
-celery -A config.celery_app worker -l info
-```
-
-Please note: For Celery's import magic to work, it is important _where_ the celery commands are run. If you are in the same folder with _manage.py_, you should be right.
-
-To run [periodic tasks](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html), you'll need to start the celery beat scheduler service. You can start it as a standalone process:
-
-```bash
-cd backend
-celery -A config.celery_app beat
-```
-
-or you can embed the beat service inside a worker with the `-B` option (not recommended for production use):
-
-```bash
-cd backend
-celery -A config.celery_app worker -B -l info
-```
-
-## Deployment
-
-The following details how to deploy this application.
-
-### Docker
-
-See detailed [cookiecutter-django Docker documentation](http://cookiecutter-django.readthedocs.io/en/latest/deployment-with-docker.html).
-
-### Payment
-
-Stripe 
-To learn more about Stripe Payments, click [here](http://www.stripe.com).
-
-
+## Contact

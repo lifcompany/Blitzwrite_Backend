@@ -92,8 +92,9 @@ LOCAL_APPS = [
     "backend.users",
     "backend.payments",
     "backend.output",
-    "backend.sitesetting"
-    "backend.seo"
+    "backend.sitesetting",
+    "backend.seo_article",
+    "explorer"
 
     # Your stuff: custom apps go here
 ]

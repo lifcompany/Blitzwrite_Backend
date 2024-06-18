@@ -179,7 +179,7 @@ LOGGING = {
 # -------------------------------------------------------------------------------
 # Tools that generate code samples can use SERVERS to point to the correct domain
 SPECTACULAR_SETTINGS["SERVERS"] = [
-    {"url": "https://lif-post.io", "description": "Production server"},
+    {"url": "https://blitzwrite.com", "description": "Production server"},
 ]
 # Your stuff...
 # ------------------------------------------------------------------------------

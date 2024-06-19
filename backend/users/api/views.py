@@ -182,7 +182,7 @@ class ForgetPasswordView(APIView):
             refresh = RefreshToken.for_user(user)
             response = send_mail(
                 email,
-                f"http://127.0.0.1:3000/reset-password/?token={str(refresh.access_token)}",
+                f"http://133.242.160.145:3000/reset-password/?token={str(refresh.access_token)}",
             )
             if response.status_code == 200:
                 return Response(
@@ -203,14 +203,15 @@ class ForgetPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     def post(self, request):
-        user = request.user
+        email=request.user
+        user = User.objects.get(email=email)
         password = request.data["password"]
         confirm_password = request.data["confirmPassword"]
-        print("2323423",confirm_password)
+
         if password == confirm_password:
-            user.password = password
+            user.set_password(password)
             user.save()
-            return Response({"success": "Reset Password"}, status=status.HTTP_200_OK)
+            return Response({"success": "success"}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Password not matched"})
 
@@ -237,6 +238,7 @@ class LoginView(APIView):
                 if user.mail_verify_statu:
                     login(request, user)
                     refresh = RefreshToken.for_user(user)
+                    print(str(refresh.access_token))
                     return Response(
                         {
                             "status": {
@@ -269,7 +271,13 @@ class LoginView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         else:
-            return Response(serializer.error_messages)
+            return Response(
+                {
+                    "error": "ログイン失敗！もう一度お試しください",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            # return Response(serializer.error_messages)
 
 
 class GetUserView(APIView):
@@ -329,3 +337,18 @@ class loginWithGoogle(APIView):
             user.save()
 
         return Response("ユーザー登録成功", status=status.HTTP_200_OK)
+
+
+class DeleteUser(APIView):
+    def post(self, request):
+        user = request.user
+        print(user)
+        del_user = User.objects.get(email=user)
+
+        if del_user:
+            del_user.delete()
+        else:
+            return Response(
+                {"error": "ユーザーが見つかりません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

@@ -604,6 +604,13 @@ def set_site(request):
         return JsonResponse(serializer.errors, status=400)
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
+@csrf_exempt
+def delete_account(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email')
+        return JsonResponse(email, status=200)
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
 
@@ -654,3 +661,64 @@ def stripe_webhook(request):
         # handle_payment_intent_succeeded(payment_intent)
 
     return Response(status=200)
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    # Handle Stripe webhook events here
+    payload = request.body
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    endpoint_secret = 'whsec_...'  
+    event = None
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        # Retrieve information about the payment
+        payment_method_details = payment_intent['payment_method_details']
+        card_details = payment_method_details['card']
+
+        # Update User model with card details
+        user_email = payment_intent['receipt_email']
+        user = User.objects.get(email=user_email)
+        user.card_brand = card_details['brand']
+        user.card_last4 = card_details['last4']
+        user.card_exp_month = card_details['exp_month']
+        user.card_exp_year = card_details['exp_year']
+        user.save()
+        
+        return JsonResponse({'status': 'success'})
+# Handle the event
+    # Handle the event (e.g., update payment status in database)
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        print(f"PaymentIntent {payment_intent['id']} failed.")
+
+        # Handle payment failure
+        return JsonResponse({'status': 'failed'})
+
+    return JsonResponse({'status': 'unknown'})
+
+
+# @csrf_exempt
+# def get_user_card_info(request):
+#     user = request.user
+#     try:
+#         card_info = {
+#             'card_brand': user.card_brand,
+#             'card_last4': user.card_last4,
+#             'card_exp_month': user.card_exp_month,
+#             'card_exp_year': user.card_exp_year,
+#         }
+#         return Response(card_info)
+#     except AttributeError:
+#         return Response({'error': 'Card information not found'}, status=404)

@@ -74,7 +74,7 @@ class RegisterView(APIView):
                             refresh = RefreshToken.for_user(user)
                             response = send_mail(
                                 email,
-                                f"http://127.0.0.1:3000/mail-verify/?token={str(refresh.access_token)}",
+                                f"http://133.242.160.145:3000/mail-verify/?token={str(refresh.access_token)}",
                             )
                             print(response)
                             if response.status_code == 200:
@@ -342,11 +342,11 @@ class loginWithGoogle(APIView):
 class DeleteUser(APIView):
     def post(self, request):
         user = request.user
-        print(user)
         del_user = User.objects.get(email=user)
 
         if del_user:
             del_user.delete()
+            return Response("削除成功", status=status.HTTP_200_OK)
         else:
             return Response(
                 {"error": "ユーザーが見つかりません。"},

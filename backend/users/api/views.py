@@ -14,28 +14,32 @@ from allauth.account.models import EmailAddress
 from backend.users.models import User
 
 from .serializers import UserSerializer, LoginSerializer
+from django.conf import settings
 
-def send_mail(email, content):
-    print(os.getenv("MAIL_KEY"))
-    email_params = {
-        "apikey": "",
-        "from": "andresimoni1223@gmail.com",
-        "to": "andresimoni1223@gmail.com",
-        "subject": "Email Verify - lif-post Account",
-        "body": f"{content}",
-        "isTransactional": True,
-    }
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    print(email, content, email_params)
-    response = requests.post(
-        "https://api.elasticemail.com/v2/email/send",
-        params=email_params,
-    )
-    return response
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
+def send_app_email(email, content ):
+    print("111111111111", email, content)
+    message = Mail(
+    from_email='santabaner1223@gmail.com',
+    to_emails= email,
+    subject='Mail-verify',
+    html_content=content)
+    try:
+        sg = SendGridAPIClient('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')
+        response = sg.send(message)
+        print("successfull", response.status_code)  # Print the status code
+        if response.status_code == 202:
+            print("Email sent successfully!")
+            return {"status": "success", "status_code": response.status_code}
+        else:
+            print(f"Failed to send email. Status code: {response.status_code}")
+            return {"status": "failure", "status_code": response.status_code}
+    except Exception as e:
+        print(e)
+        return {"status": "error", "message": str(e)}
 class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = UserSerializer
     queryset = User.objects.all()
@@ -56,6 +60,7 @@ class RegisterView(APIView):
     authentication_classes = ()
 
     def post(self, request):
+        front_url=os.getenv("FRONT_URL")
         try:
             data = request.data
             email = data["email"]
@@ -72,22 +77,32 @@ class RegisterView(APIView):
                         if User.objects.filter(email=email).exists():
                             # mail verify
                             refresh = RefreshToken.for_user(user)
-                            response = send_mail(
+                            response = send_app_email(
                                 email,
-                                f"http://133.242.160.145:3000/mail-verify/?token={str(refresh.access_token)}",
+                                f"{front_url}/mail-verify/?token={str(refresh.access_token)}",
                             )
-                            print(response)
-                            if response.status_code == 200:
+                            if response["status"] == "success":
                                 return Response(
                                     {
                                         "success": "ユーザーが正常に新規登録され、認証リンクが送信されました。"
                                     },
                                     status=status.HTTP_201_CREATED,
                                 )
+                            elif response["status"] == "failure":
+                                return Response(
+                                    {
+                                        "error": "認証リンクを送信できませんでした。",
+                                        "details": response
+                                    },
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                                )
                             else:
                                 return Response(
-                                    {"success": "認証リンクを再送する。"},
-                                    status=status.HTTP_201_CREATED,
+                                    {"error": "メールサーバー側のエラーにより、認証コードを送信できません。"
+                                    "後ほど再試行してください。",
+                                    "details": response 
+                                    },
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                                 )
                         else:
                             return Response(
@@ -177,22 +192,35 @@ class ForgetPasswordView(APIView):
 
     def post(self, request):
         email = request.data["email"]
+        front_url=os.getenv("FRONT_URL")
+        print(front_url)
         try:
             user = User.objects.get(email=email)
             refresh = RefreshToken.for_user(user)
-            response = send_mail(
+            response = send_app_email(
                 email,
-                f"http://133.242.160.145:3000/reset-password/?token={str(refresh.access_token)}",
+                f"{front_url}/reset-password/?token={str(refresh.access_token)}",
             )
-            if response.status_code == 200:
+            if response["status"] == "success":
                 return Response(
                     {"success": "認証リンクが送信されました。"},
                     status=status.HTTP_201_CREATED,
                 )
+            elif response["status"] == "failure":
+                return Response(
+                    {
+                        "error": "認証リンクを送信できませんでした。",
+                        "details": response  # Optional: Include details for debugging
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
             else:
                 return Response(
-                    {"success": "Resend verification link."},
-                    status=status.HTTP_201_CREATED,
+                    {"error": "メールサーバー側のエラーにより、認証コードを送信できません。"
+                    "後ほど再試行してください。",
+                    "details": response 
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         except Exception as e:
             print(e)

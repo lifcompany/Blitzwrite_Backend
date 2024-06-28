@@ -663,8 +663,8 @@ def stripe_webhook(request):
     return Response(status=200)
 
 
-@csrf_exempt
-def stripe_webhook(request):
+# @csrf_exempt
+# def stripe_webhook(request):
     # Handle Stripe webhook events here
     payload = request.body
     sig_header = request.META['HTTP_STRIPE_SIGNATURE']

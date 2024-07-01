@@ -593,16 +593,17 @@ def download_text_file(request, filename):
     else:
         raise Http404("File not found")
     
-@csrf_exempt
-def set_site(request):
-    if request.method == 'POST':
-        data = JSONParser().parse(request)
-        serializer = SiteDataSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=201)
-        return JsonResponse(serializer.errors, status=400)
-    return JsonResponse({"error": "Invalid request method"}, status=405)
+class SetSite(APIView):
+    def post(self, request):
+        if request.method == 'POST':
+            user_email = request.user
+            data = JSONParser().parse(request)
+            serializer = SiteDataSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return JsonResponse(serializer.data, status=201)
+            return JsonResponse(serializer.errors, status=400)
+        return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @csrf_exempt
 def delete_account(request):

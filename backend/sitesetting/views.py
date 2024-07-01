@@ -593,23 +593,6 @@ def download_text_file(request, filename):
     else:
         raise Http404("File not found")
     
-# class SetSite(APIView):
-#     def post(self, request):
-#         if request.method == 'POST':
-#             user_email = request.user.email
-#             data = JSONParser().parse(request)
-#             data['email'] = user_email
-#             site_data_list = SiteData.objects.filter(site_url=data['site_url'])
-
-#             serializer = SiteDataSerializer(data=data)
-#             if serializer.is_valid():
-#                 serializer.save()
-#                 return JsonResponse(serializer.data, status=201)
-#             return JsonResponse(serializer.errors, status=400)
-#         return JsonResponse({"error": "Invalid request method"}, status=405)
-
-
-
 class SetSite(APIView):
     def post(self, request):
         user_email = request.user.email

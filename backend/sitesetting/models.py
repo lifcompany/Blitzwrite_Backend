@@ -1,5 +1,7 @@
 from django.db import models
 
+def default_email():
+    return 'admin@example.com'  # Example default email
 class LifVersion(models.Model):
     display_name = models.CharField(max_length=100)
     model_name = models.CharField(max_length=100)
@@ -10,6 +12,7 @@ class LifVersion(models.Model):
         return self.display_name
 
 class SiteData(models.Model):
+    email = models.EmailField(max_length=255, default=default_email)
     site_name = models.CharField(max_length=255)
     site_url = models.URLField(max_length=200)
     admin_name = models.CharField(max_length=255)

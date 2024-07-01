@@ -16,7 +16,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods import posts
 from django.utils.decorators import method_decorator
-
+from rest_framework.permissions import IsAuthenticated
 from .models import LifVersion, SiteData
 from .serializers import SiteDataSerializer, LifVersionSerializer
 
@@ -593,17 +593,52 @@ def download_text_file(request, filename):
     else:
         raise Http404("File not found")
     
+# class SetSite(APIView):
+#     def post(self, request):
+#         if request.method == 'POST':
+#             user_email = request.user.email
+#             data = JSONParser().parse(request)
+#             data['email'] = user_email
+#             site_data_list = SiteData.objects.filter(site_url=data['site_url'])
+
+#             serializer = SiteDataSerializer(data=data)
+#             if serializer.is_valid():
+#                 serializer.save()
+#                 return JsonResponse(serializer.data, status=201)
+#             return JsonResponse(serializer.errors, status=400)
+#         return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+
 class SetSite(APIView):
     def post(self, request):
-        if request.method == 'POST':
-            user_email = request.user
-            data = JSONParser().parse(request)
+        user_email = request.user.email
+        data = JSONParser().parse(request)
+        data['email'] = user_email
+        try:
+            site_data = SiteData.objects.get(site_url=data['site_url'])
+            serializer = SiteDataSerializer(site_data, data=data, partial=True)
+        except SiteData.DoesNotExist:
             serializer = SiteDataSerializer(data=data)
-            if serializer.is_valid():
-                serializer.save()
-                return JsonResponse(serializer.data, status=201)
-            return JsonResponse(serializer.errors, status=400)
-        return JsonResponse({"error": "Invalid request method"}, status=405)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetSite(APIView):
+    def get(self, request):
+        user_email = request.user.email
+        try:
+            user_email = request.user.email
+            site_data_list = SiteData.objects.filter(email=user_email)
+            if not site_data_list.exists():
+                return Response({"error": "Site data not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'site_data': list(site_data_list.values())}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
 def delete_account(request):

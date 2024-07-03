@@ -1,33 +1,25 @@
-import os
-from django.http import FileResponse, Http404, JsonResponse
-from openai import OpenAI
-from django.conf import settings
+import requests
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 
-class Base:
-    stop_execution = False
-
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
-print(settings.OPENAI_API_KEY)
-print(settings.BASE_DIR)
-
-@csrf_exempt 
-def set_keyword(request):
-    print("111111")
-    parameters = {
-        "temperature": 0.2,
-        "max_tokens": 500,
-        "frequency_penalty": 0.0,
-        'timeout': 1200
-    }
-    conversation_history = [{"role": "system", "content": "You are a helpful assistant."},{"role": "user", "content": "Please provide 10 SEO keywords similar to '車買取'"}]
-    responses = []
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=conversation_history,
-        **parameters
-    )
-    responses.append(response.choices[0].message.content.strip())
-    print(responses)
-
-    return JsonResponse(responses, safe=False)
+@require_GET
+@csrf_exempt
+def autosuggest(request):
+    query = request.GET.get('q', '')
+    client = request.GET.get('client', 'chrome')
+    
+    if len(query) > 2:
+        url = 'https://google.de/complete/search'
+        params = {
+            'q': query,
+            'client': client
+        }
+        response = requests.get(url, params=params)
+        
+        if response.status_code == 200:
+            return JsonResponse(response.json(), safe=False)
+        else:
+            return JsonResponse({'error': 'Failed to fetch suggestions'}, status=response.status_code)
+    else:
+        return JsonResponse({'error': 'Query too short'}, status=400)

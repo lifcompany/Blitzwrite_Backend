@@ -10,23 +10,127 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.account.models import EmailAddress
+from sitesetting.models import SiteData
 
 from backend.users.models import User
-
 from .serializers import UserSerializer, LoginSerializer
 from django.conf import settings
 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+def send_app_email(email, verification_link):
+    print(verification_link)
 
-def send_app_email(email, content ):
-    print("111111111111", email, content)
+    html_content = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Verification</title>
+        <style>
+            body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            }
+            .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            }
+            .header {
+            background-color: #00bda5;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+            }
+            .header h1 {
+            margin: 0;
+            }
+            .content {
+            padding: 20px;
+            }
+            .content h2 {
+            color: #3a536d;
+            font-size: 24px;
+            }
+            .content p {
+            color: #555555;
+            font-size: 16px;
+            line-height: 1.5;
+            }
+            .footer {
+            background-color: #f4f4f4;
+            color: #888888;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            }
+            .footer a {
+            color: #00bda5;
+            text-decoration: none;
+            }
+            .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 0;
+            background-color: #00bda5;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 5px;
+            }
+        </style>
+        </head>
+        <body>
+        <div class="container">
+            <div class="header">
+            <h1>Blitzwrite</h1>
+            </div>
+            <div class="content">
+            <h2>Welcome, </h2>
+            <p>
+                Thank you for registering with Blitzwrite. Please verify your email address to complete your registration and activate your account.
+            </p>
+            <p>
+                Click the button below to verify your email address:
+            </p>
+            <a href="{{ verification_link }}" class="button">Verify Email Address</a>
+            <div id=":im" class="a3s aiL "><a href="{{ verification_link }}" target="_blank">{{ verification_link }}</a><img alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important"><div class="yj6qo"></div><div class="adL">
+            </div></div>
+            <p>
+                If you did not create an account, please ignore this email or contact our support team.
+            </p>
+            <p>
+                Best regards,<br>
+                The Support Team
+            </p>
+            </div>
+            <div class="footer">
+            <p>
+                &copy; 2024 株式会社LIF. All rights reserved.
+            </p>
+            <p>
+                <a href="#">Unsubscribe</a> | <a href="#">Privacy Policy</a>
+            </p>
+            </div>
+        </div>
+        </body>
+        </html>
+        """
+    html_content = html_content.replace("{{ verification_link }}", verification_link)
     message = Mail(
     from_email='santabaner1223@gmail.com',
-    to_emails= email,
+    to_emails=email,
     subject='Mail-verify',
-    html_content=content)
+    html_content=html_content
+    )
     try:
         sg = SendGridAPIClient('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')
         response = sg.send(message)
@@ -370,10 +474,20 @@ class loginWithGoogle(APIView):
 class DeleteUser(APIView):
     def post(self, request):
         user = request.user
+        email = request.data.get("email")
+        print(email, user.email)
+        if user.email != email:
+            return Response(
+                {"error": "Please input the correct Email Address。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         del_user = User.objects.get(email=user)
+        del_user_site = SiteData.objects.filter(email = user)
+
 
         if del_user:
             del_user.delete()
+            del_user_site.delete()
             return Response("削除成功", status=status.HTTP_200_OK)
         else:
             return Response(

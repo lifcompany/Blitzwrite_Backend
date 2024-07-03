@@ -649,8 +649,6 @@ def create_payment_intent(request):
     else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
     
-
-
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status

@@ -378,7 +378,7 @@ SPECTACULAR_SETTINGS = {
 
 SIMPLE_JWT = {
     # token expiration times
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=30),
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(days=60),
     "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
     # token rotation options
     # 'ROTATE_REFRESH_TOKENS': False,

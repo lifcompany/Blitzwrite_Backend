@@ -1,9 +1,6 @@
-# urls.py
-
 from django.urls import path
-from .views import set_keyword
-
+from .views import autosuggest
 
 urlpatterns = [
-    path('set_keyword/', set_keyword, name='set_keyword'),
+    path('auto-suggest/', autosuggest, name='autosuggest'),
 ]

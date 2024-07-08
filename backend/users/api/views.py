@@ -11,6 +11,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.account.models import EmailAddress
 from sitesetting.models import SiteData
+from django.http import FileResponse, Http404, JsonResponse
+import jwt
 
 from backend.users.models import User
 from .serializers import UserSerializer, LoginSerializer
@@ -176,7 +178,6 @@ class RegisterView(APIView):
                         user = User.objects.create_user(
                             email=email,
                             password=password,
-
                         )
                         if User.objects.filter(email=email).exists():
                             # mail verify
@@ -332,7 +333,6 @@ class ForgetPasswordView(APIView):
                 {"error": "ユーザーが存在しない"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-
 class ResetPasswordView(APIView):
     def post(self, request):
         email=request.user
@@ -347,11 +347,9 @@ class ResetPasswordView(APIView):
         else:
             return Response({"error": "Password not matched"})
 
-
 class LoginView(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = ()
-
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -360,12 +358,9 @@ class LoginView(APIView):
         print("userValid=====>",serializer.is_valid())
 
         if serializer.is_valid():
-            print("user validated ------------------------>", serializer.validated_data)
             email = serializer.validated_data["email"]
             password = serializer.validated_data["password"]
-            print("user Validate data ------------------------>", email, password)
             user = authenticate(request, email=email, password=password)
-            print("userEmailAddress=====>", user)
             if user is not None:
                 if user.mail_verify_statu:
                     login(request, user)
@@ -494,3 +489,105 @@ class DeleteUser(APIView):
                 {"error": "ユーザーが見つかりません。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+class GoogleLoginCheck(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+
+    def post(self, request):
+        credential = request.data.get('credential')
+        print(credential)
+        clientId = "304531247476-58f940f3b0dgrupg95cdo8b51fspupdv.apps.googleusercontent.com"
+        if not credential:
+            return JsonResponse({'error': 'Google credentials not received'}, status=400)
+
+        try:
+            header = jwt.get_unverified_header(credential)
+            rsa_key = self.get_google_public_key(header['kid'])
+            decoded_token = jwt.decode(credential, rsa_key, algorithms=["RS256"], audience=clientId, leeway=600)
+
+            email = decoded_token.get('email')
+
+            if not email:
+                return JsonResponse({'error': 'Failed to extract email from Google credentials'}, status=400)
+            
+            is_registered = User.objects.filter(email=email).exists()
+            if not is_registered:
+                User.objects.create_user(email=email, password=email, mail_verify_statu=True)
+
+            user = authenticate(request, email=email, password=email)
+            if user is not None:
+                refresh = RefreshToken.for_user(user)
+                print(str(refresh.access_token))
+
+            return JsonResponse(
+                {
+                    'message': 'Successfully authenticated with Google',
+                    'accessToken':str(refresh.access_token)
+                } 
+            )
+        except jwt.ExpiredSignatureError:
+            return JsonResponse({'error': 'Token has expired'}, status=400)
+        except jwt.InvalidTokenError:
+            return JsonResponse({'error': 'Invalid token'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    def get_google_public_key(self, kid):
+        # Get Google's public keys
+        response = requests.get("https://www.googleapis.com/oauth2/v3/certs")
+        if response.status_code != 200:
+            raise ValueError("Failed to fetch Google public keys")
+
+        keys = response.json()['keys']
+        for key in keys:
+            if key['kid'] == kid:
+                return jwt.algorithms.RSAAlgorithm.from_jwk(key)
+        raise ValueError("Key ID not found in Google's public keys")
+        
+
+class GoogleLoginCheck2(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+         
+    def post(self, request):
+
+        access_token = request.data.get('access_token')
+        token_info_url = 'https://www.googleapis.com/oauth2/v3/tokeninfo'
+        params = {'access_token': access_token}
+        
+        try:
+            response = requests.get(token_info_url, params=params)
+            token_info = response.json()
+
+            if response.status_code == 200:
+                # Token is valid, proceed with your logic (e.g., register user, generate JWT token)
+                # Example logic: register or authenticate the user based on token info
+                email = token_info.get('email')
+                # Add your logic here to register or authenticate the user
+                # Example: user = User.objects.get(email=email)
+                if not email:
+                    return JsonResponse({'error': 'Failed to extract email from Google credentials'}, status=400)
+            
+                is_registered = User.objects.filter(email=email).exists()
+                if not is_registered:
+                    User.objects.create_user(email=email, password=email, mail_verify_statu=True)
+
+                user = authenticate(request, email=email, password=email)
+                if user is not None:
+                    refresh = RefreshToken.for_user(user)
+                    print(str(refresh.access_token))
+                return JsonResponse(
+                    {
+                        'message': 'Successfully authenticated with Google',
+                        'accessToken':str(refresh.access_token)
+                    } 
+                )
+            else:
+                # Token validation failed, handle the error
+                return JsonResponse({'error': 'Invalid access token'}, status=401)
+
+        except requests.exceptions.RequestException as e:
+            # Handle network or server errors
+            return JsonResponse({'error': f'Request failed: {e}'}, status=500)
+
+

@@ -21,7 +21,8 @@ from .models import LifVersion, SiteData
 from .serializers import SiteDataSerializer, LifVersionSerializer
 
 from django.views.decorators.http import require_http_methods
-
+import requests
+from bs4 import BeautifulSoup
 class Base:
     stop_execution = False
 
@@ -38,20 +39,48 @@ def get_file_list(request):
     print(file_list)
     return JsonResponse(file_list, safe=False)
 
-def get_model_list(request):
-    models = LifVersion.objects.all()
-    model_list = []
-    for model in models:
-        model_dict = {
-            'id': model.id,
-            'display_name': model.display_name,
-            'model_name': model.model_name,
-            'endpoint': model.endpoint,
-            'params': model.params,
-        }
-        model_list.append(model_dict)
+
+class GetModel(APIView):
+    def get(self, request):
+        models = LifVersion.objects.all()
+        model_list = []
+        for model in models:
+            model_dict = {
+                'id': model.id,
+                'display_name': model.display_name,
+                'model_name': model.model_name,
+                'endpoint': model.endpoint,
+                'params': model.params,
+            }
+            model_list.append(model_dict)
     
-    return JsonResponse(model_list, safe=False)
+        return JsonResponse(model_list, safe=False)
+        user_email = request.user.email
+        try:
+            user_email = request.user.email
+            site_data_list = SiteData.objects.filter(email=user_email)
+            if not site_data_list.exists():
+                return Response({"error": "Site data not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'site_data': list(site_data_list.values())}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+# def get_model_list(request):
+#     models = LifVersion.objects.all()
+#     model_list = []
+#     for model in models:
+#         model_dict = {
+#             'id': model.id,
+#             'display_name': model.display_name,
+#             'model_name': model.model_name,
+#             'endpoint': model.endpoint,
+#             'params': model.params,
+#         }
+#         model_list.append(model_dict)
+    
+#     return JsonResponse(model_list, safe=False)
 
 
 
@@ -622,6 +651,28 @@ class GetSite(APIView):
             return Response({'site_data': list(site_data_list.values())}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+def get_site_title(request):
+    site_url = request.GET.get('siteUrl')
+    print(site_url)
+    if site_url.strip() != '':
+        try:
+            response = requests.get(site_url)
+            response.raise_for_status()  # Raise an exception for bad responses (4xx or 5xx)
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+            title = soup.title.string if soup.title else 'Title not found'
+
+            return JsonResponse({'title': title})
+        
+        except requests.RequestException as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    else:
+        return JsonResponse({'error': 'Empty URL provided'}, status=400)
+        
+
+
 
 @csrf_exempt
 def delete_account(request):

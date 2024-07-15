@@ -51,9 +51,7 @@ class User(AbstractUser):
     first_name = models.CharField(_("firstName of User"), blank=True, max_length=100)
     last_name = models.CharField(_("lastName of User"), blank=True, max_length=100)
     user_type = CharField(max_length=50, choices=USER_TYPE_CHOICES, default="User")
-    phoneNumber = models.CharField(
-        _("phone Number of User"), blank=True, max_length=255
-    )
+    is_premium = models.BooleanField(default=False)
     email = EmailField(_("email address"), unique=True)
     username = None  # type: ignore[assignment]
     profile_info = models.TextField(blank=True)

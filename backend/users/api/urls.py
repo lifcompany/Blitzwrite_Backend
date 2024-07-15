@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import LoginView, RegisterView, GoogleRegister, GetUserView, MailVerifyView, ForgetPasswordView, ResetPasswordView, loginWithGoogle, GetUserInfo, DeleteUser, GoogleLoginCheck, GoogleLoginCheck2
+from .views import LoginView, RegisterView, GoogleRegister, GetUserView, MailVerifyView, ForgetPasswordView, ResetPasswordView, loginWithGoogle, GetUserInfo, DeleteUser, GoogleLoginCheck, GoogleLoginCheck2, CheckPremiumStatus
 
 urlpatterns = [
     path("login/", view=LoginView.as_view(), name="login"),
@@ -14,7 +14,8 @@ urlpatterns = [
     path("loginWithGoogle/", view=loginWithGoogle.as_view(), name="loginWithGoogle"),
     path("delete_account/", view=DeleteUser.as_view(), name="delete_account"),
     path("check-registration/", view=GoogleLoginCheck.as_view(), name="checkregistration"),
-    path("check-google-registration/", view=GoogleLoginCheck2.as_view(), name="checkgoogleregistration")
+    path("check-google-registration/", view=GoogleLoginCheck2.as_view(), name="checkgoogleregistration"),
+    path("check-premium/", view=CheckPremiumStatus.as_view(), name="check-premium")
 
     
 ]

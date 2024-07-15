@@ -591,3 +591,23 @@ class GoogleLoginCheck2(APIView):
             return JsonResponse({'error': f'Request failed: {e}'}, status=500)
 
 
+
+
+class CheckPremiumStatus(APIView):
+
+    def post(self, request):
+        user = request.user
+        if user.is_premium:
+            return Response(
+                {
+                    "status": "is premium",
+                },
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {
+                    "status": "is not premium",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -3,7 +3,7 @@
 
 from pathlib import Path
 import datetime
-
+import os
 import environ
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent.parent
@@ -403,3 +403,5 @@ SIMPLE_JWT = {
     # 'UPDATE_LAST_LOGIN': False,
 }
 
+GOOGLE_ADS_YAML_PATH = os.path.join(BASE_DIR, 'google-ads.yaml')
+GOOGLE_ADS_CUSTOMER_ID = "9952679872"

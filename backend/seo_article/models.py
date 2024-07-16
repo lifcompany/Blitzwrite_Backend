@@ -25,3 +25,10 @@ class SuggestedKeyword(models.Model):
 
     def __str__(self):
         return self.keyword
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    credits = models.IntegerField(default=5)
+
+    def __str__(self):
+        return self.user.username

@@ -1,5 +1,5 @@
 import requests
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate, login, get_user_model
@@ -25,6 +25,18 @@ from .serializers import SuggestKeywordSerializer
 from rest_framework import status
 from .models import Keyword, MainKeyword
 from backend.users.models import User
+from sitesetting.models import LifVersion, SiteData
+
+
+from django.contrib.auth.decorators import login_required
+from .models import UserProfile
+from openai import OpenAI
+import openai
+import os
+
+client = OpenAI(    
+        api_key=os.getenv("OPENAI_API_KEY")
+)
 
 def send_Notification_email(email):
 
@@ -290,32 +302,134 @@ class SaveKeywords(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+     
+     
+
+def smart_convert(value):
+    try:
+        return eval(value)
+    except:
+        return value
+
+   
 class CreateHeading(APIView):
     def post(self, request):
         try:
-            keywords_to_save = request.data.get('keywords', [])
-            main_keyword_text = request.data.get('main_keyword', '')
+            user = request.user
+            user_profile = UserProfile.objects.get(user=user)
+            
+            # Check if the user is non-premium and has no credits left
+            if not user.is_premium and user_profile.credits <= 0:
+                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
 
-            user = request.user 
-            print(user, keywords_to_save, main_keyword_text)
+            keywords = request.data.get('keywords', [])
+            versionName = request.data.get('versionName')
+            
+            if not keywords:
+                return JsonResponse({'error': 'Keywords are required.'}, status=400)
 
-            main_keyword, created = MainKeyword.objects.get_or_create(user=user, keyword=main_keyword_text)
+            if versionName:
+                try:
+                    model = LifVersion.objects.get(model_name=versionName)
+                    print("model", model)
+                except LifVersion.DoesNotExist:
+                    
+                    return JsonResponse({'error': 'Invalid versionName'}, status=400)
 
-            serialized_keywords = []
-            for keyword_data in keywords_to_save:
-                serialized_keywords.append({
-                    'main_keyword': main_keyword.id, 
-                    'name': keyword_data.get('keyword', ''),
-                    'volume': keyword_data.get('volume', 0)
-                })
+                model_name = model.model_name
+                endpoint = model.endpoint
+                params = model.params
+                param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
+                parameters = {}
+                for line in param_lines:
+                    key, value = line.split('=')
+                    parameters[key.strip()] = value.strip()
+                     
+                parameters = {k: smart_convert(v) for k, v in parameters.items()}
+                if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
+                    
+                    print(model_name, endpoint)
+                    parameters = {
+                        "temperature": 0.2,
+                        "max_tokens": 500,
+                        "frequency_penalty": 0.0,
+                        'timeout': 1200
+                    }
+                
+                responses = []
+                conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
+                for keyword in keywords:
+                    prompt = f"Please provide titles so that articles can be created using the keyword 「{keyword['keyword']}」. Please use H tags to distinguish the titles."
+                    print(prompt)
+                    
+                    if endpoint == "https://api.openai.com/v1/chat/completions":
+                        conversation_history.append({"role": "user", "content": prompt})
+                    else:
+                        conversation_history = prompt
+                    print("conversation_history", conversation_history)
+                    if endpoint == "https://api.openai.com/v1/chat/completions":
+                        response = client.chat.completions.create(
+                            model= model_name,
+                            messages=conversation_history,
+                            **parameters
+                        )
+                        generated_title = response.choices[0].message['content']
+                    
+                    else:
+                        response = client.completions.create(
+                            model= model_name,
+                            prompt=conversation_history,
+                            **parameters
+                        )
+                        
+                        generated_title = response.choices[0]['text']
+                        
+                    
+                    # if endpoint == "https://api.openai.com/v1/chat/completions":
+                    #     responses.append(response.choices[0].message.content.strip())
+                    # else:
+                    #     responses.append(response.choices[0].text)
+                    
+                    responses.append(generated_title.strip())
 
-            serializer = SuggestKeywordSerializer(data=serialized_keywords, many=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                if not user.is_premium:
+                    user_profile.credits -= 1
+                    user_profile.save()
+
+                # Return the generated title
+                return JsonResponse({'title': responses})
+            
             else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+                return JsonResponse({'error': 'GPTモデルを選択していないか、選択したモデルが正しくありません。'}, status=400)
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GetUserCredit(APIView):
+    def get(self, request):
+        user_profile = request.user.userprofile
+        data = {
+            'credits': user_profile.credits,
+            'is_premium': request.user.is_premium,
+            'email': request.user.email
+        }
+        return JsonResponse(data)
+
+class CreateArticle(APIView):
+    def post(self, request):
+        user_profile = request.user.userprofile
+        if not request.user.is_premium and user_profile.credits <= 0:
+            return HttpResponse("You have no credits left to create an article.", status=403)
+
+        if request.method == 'POST':
+            # Handle article creation
+            # ...
+
+            # Deduct one credit if the user is not premium
+            if not request.user.is_premium:
+                user_profile.credits -= 1
+                user_profile.save()
+
+            return JsonResponse({'message': 'Article created successfully'})
+
+        return HttpResponse(status=405)

@@ -611,3 +611,8 @@ class CheckPremiumStatus(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+class GetUserEmail(APIView):
+    def get(self, request):
+        user = request.user
+        return JsonResponse({'email': user.email})

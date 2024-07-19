@@ -229,7 +229,7 @@ def send_reset_password(email, verification_link):
             <p>
                 Click the button below to verify your email address:
             </p>
-            <a href="{{ verification_link }}" class="button">Verify Email Address</a>
+            <a href="{{ verification_link }}" class="button">パスワードの再設定</a>
             <div id=":im" class="a3s aiL "><a href="{{ verification_link }}" target="_blank">{{ verification_link }}</a><img alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important"><div class="yj6qo"></div><div class="adL">
             </div></div>
             <p>

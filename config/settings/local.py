@@ -16,7 +16,7 @@ SECRET_KEY = env(
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ["localhost", "0.0.0.0", "127.0.0.1", "133.242.160.145"]  # noqa: S104
 
-CORS_ORIGIN_WHITELIST = ["http://localhost:3000", "http://localhost:3001", "http://133.242.160.145:3000", "http://133.242.160.145", "http://127.0.0.1:3000"]
+CORS_ORIGIN_WHITELIST = ["http://localhost:3000", "http://localhost:3001", "http://133.242.160.145:3000", "http://133.242.160.145", "http://127.0.0.1:3000", "http://dev.blitzwrite.com"]
 # CACHES
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#caches

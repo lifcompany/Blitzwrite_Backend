@@ -69,7 +69,9 @@ celerybeat-schedule
 .venv
 venv/
 ENV/
+result/
 
+cred.json
 # Rope project settings
 .ropeproject
 
@@ -279,3 +281,5 @@ backend/media/
 .env
 .envs/*
 !.envs/.local/
+
+

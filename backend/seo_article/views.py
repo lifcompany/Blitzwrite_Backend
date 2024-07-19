@@ -18,12 +18,11 @@ from google.ads.googleads.errors import GoogleAdsException
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
-from seo_article.models import MainKeyword
 from .serializers import SuggestKeywordSerializer
 
 
 from rest_framework import status
-from .models import Keyword, MainKeyword
+from .models import Keyword, MainKeyword, SuggestedKeyword
 from backend.users.models import User
 from sitesetting.models import LifVersion, SiteData
 
@@ -33,6 +32,19 @@ from .models import UserProfile
 from openai import OpenAI
 import openai
 import os
+import json
+from django.utils.timezone import now
+from google.oauth2 import service_account
+import datetime
+import gspread
+import re
+
+from wordpress_xmlrpc import Client, WordPressPost
+from wordpress_xmlrpc.methods import posts
+
+class Base:
+    stop_execution=False,
+    status=""
 
 client = OpenAI(    
         api_key=os.getenv("OPENAI_API_KEY")
@@ -283,8 +295,17 @@ class SaveKeywords(APIView):
             user = request.user 
             print(user, keywords_to_save, main_keyword_text)
 
+            # Get or create the main keyword
             main_keyword, created = MainKeyword.objects.get_or_create(user=user, keyword=main_keyword_text)
 
+            if not created:
+                main_keyword.created_at = now()
+                main_keyword.save()
+
+                # Delete existing suggested keywords for the main keyword
+                SuggestedKeyword.objects.filter(main_keyword=main_keyword).delete()
+
+            # Prepare new keyword data for serialization
             serialized_keywords = []
             for keyword_data in keywords_to_save:
                 serialized_keywords.append({
@@ -293,6 +314,8 @@ class SaveKeywords(APIView):
                     'volume': keyword_data.get('volume', 0)
                 })
             print(serialized_keywords)
+
+            # Serialize and save the new keywords
             serializer = SuggestKeywordSerializer(data=serialized_keywords, many=True)
             if serializer.is_valid():
                 serializer.save()
@@ -302,7 +325,6 @@ class SaveKeywords(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-     
      
 
 def smart_convert(value):
@@ -347,8 +369,6 @@ class CreateHeading(APIView):
                      
                 parameters = {k: smart_convert(v) for k, v in parameters.items()}
                 if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
-                    
-                    print(model_name, endpoint)
                     parameters = {
                         "temperature": 0.2,
                         "max_tokens": 500,
@@ -359,21 +379,21 @@ class CreateHeading(APIView):
                 responses = []
                 conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
                 for keyword in keywords:
-                    prompt = f"Please provide titles so that articles can be created using the keyword 「{keyword['keyword']}」. Please use H tags to distinguish the titles."
-                    print(prompt)
-                    
+                    prompt = f"I am going to write an article with the keyword 「{keyword['keyword']}」. Please write the one title of the article."
+  
                     if endpoint == "https://api.openai.com/v1/chat/completions":
                         conversation_history.append({"role": "user", "content": prompt})
                     else:
                         conversation_history = prompt
-                    print("conversation_history", conversation_history)
+                    print("conversation_history", conversation_history, parameters)
                     if endpoint == "https://api.openai.com/v1/chat/completions":
                         response = client.chat.completions.create(
                             model= model_name,
                             messages=conversation_history,
                             **parameters
                         )
-                        generated_title = response.choices[0].message['content']
+                        print(response.choices[0].message.content)
+                        generated_title = response.choices[0].message.content
                     
                     else:
                         response = client.completions.create(
@@ -382,14 +402,7 @@ class CreateHeading(APIView):
                             **parameters
                         )
                         
-                        generated_title = response.choices[0]['text']
-                        
-                    
-                    # if endpoint == "https://api.openai.com/v1/chat/completions":
-                    #     responses.append(response.choices[0].message.content.strip())
-                    # else:
-                    #     responses.append(response.choices[0].text)
-                    
+                        generated_title = response.choices[0].text                    
                     responses.append(generated_title.strip())
 
                 if not user.is_premium:
@@ -404,6 +417,311 @@ class CreateHeading(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class CreateConfig(APIView):
+    def post(self, request):
+        try:
+            user = request.user
+            user_profile = UserProfile.objects.get(user=user)
+            
+            # Check if the user is non-premium and has no credits left
+            if not user.is_premium and user_profile.credits <= 0:
+                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
+
+            keywords = request.data.get('keywords', [])
+            versionName = request.data.get('versionName')
+            
+            if not keywords:
+                return JsonResponse({'error': 'Keywords are required.'}, status=400)
+
+            if versionName:
+                try:
+                    model = LifVersion.objects.get(model_name=versionName)
+                    print("model", model)
+                except LifVersion.DoesNotExist:
+                    
+                    return JsonResponse({'error': 'Invalid versionName'}, status=400)
+
+                model_name = model.model_name
+                endpoint = model.endpoint
+                params = model.params
+                param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
+                parameters = {}
+                for line in param_lines:
+                    key, value = line.split('=')
+                    parameters[key.strip()] = value.strip()
+                     
+                parameters = {k: smart_convert(v) for k, v in parameters.items()}
+                if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
+                    
+                    print(model_name, endpoint, keywords)
+                    parameters = {
+                        "temperature": 0.2,
+                        "max_tokens": 500,
+                        "frequency_penalty": 0.0,
+                        'timeout': 1200
+                    }
+                
+                responses = []
+                for keyword in keywords:
+                    conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
+                    prompt = f"Please provide titles so that articles can be created using the keyword 「{keyword['keyword']}」. Please use H tags to distinguish the titles. please create the titles as the array data. And  Please write in the same configuration as next.'<h2>1. タイトル</h2> <h3>1.1 タイトル</h3> <h3>1.2 タイトル</h3> <h3>1.3 タイトル</h3> <h3>1.4 タイトル</h3> <h3>1.5イトル</h3> <h2>2. タイトル</h2> <h3>2.1 タイトル</h3> <h3>2.2 タイトル</h3> <h3>2.3 タイトル</h3> <h3>2.4 タイトル</h3> <h3>2.5タイトル</h3> <h3>2.6 タイトル</h3>'. I need only array data."
+                    print(prompt)
+                    
+                    if endpoint == "https://api.openai.com/v1/chat/completions":
+                        conversation_history.append({"role": "user", "content": prompt})
+                    else:
+                        conversation_history = prompt
+                    print("conversation_history", conversation_history, parameters)
+                    if endpoint == "https://api.openai.com/v1/chat/completions":
+                        response = client.chat.completions.create(
+                            model= model_name,
+                            messages=conversation_history,
+                            **parameters
+                        )
+                        print(response.choices[0].message.content)
+                        generated_title = response.choices[0].message.content
+                    
+                    else:
+                        response = client.completions.create(
+                            model= model_name,
+                            prompt=conversation_history,
+                            **parameters
+                        )
+                        
+                        generated_title = response.choices[0].text
+                     
+                    def extract_list_from_string(text):
+                        # Regular expression to match the list part
+                        list_regex = re.compile(r'\[\s*(".*?"(?:,\s*".*?")*)\s*\]', re.DOTALL)
+                        match = list_regex.search(text)
+                        
+                        if match:
+                            list_string = match.group(1)
+                            
+                            # Convert the string representation of the list to an actual list
+                            # Replace double quotes with single quotes to safely evaluate the list string
+                            list_string = list_string.replace('\\"', '"')
+                            list_items = re.findall(r'"(.*?)"', list_string)
+                            
+                            return list_items
+                        else:
+                            return None   
+                        
+                    extracted_list = extract_list_from_string(generated_title)
+                    print("ssssssssssssssssssssss", extracted_list)
+                
+                    responses.append(extracted_list)
+                    
+
+                if not user.is_premium:
+                    user_profile.credits -= 1
+                    user_profile.save()
+
+                return JsonResponse({'config': responses})
+            
+            else:
+                return JsonResponse({'error': 'GPTモデルを選択していないか、選択したモデルが正しくありません。'}, status=400)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CreateArticle(APIView):
+    def post(self, request):
+        try:
+            user = request.user
+            user_profile = UserProfile.objects.get(user=user)
+            if not user.is_premium and user_profile.credits <= 0:
+                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
+
+            keywordconfigs = request.data.get('keywordconfigs', [])
+            versionName = request.data.get('versionName')
+            upload_info =request.data.get('upload_info')
+            
+            
+            if versionName:
+                try:
+                    model = LifVersion.objects.get(model_name=versionName)
+                    print("model", model)
+                except LifVersion.DoesNotExist:
+                    
+                    return JsonResponse({'error': 'Invalid versionName'}, status=400)
+
+                model_name = model.model_name
+                endpoint = model.endpoint
+                params = model.params
+                param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
+                parameters = {}
+                for line in param_lines:
+                    key, value = line.split('=')
+                    parameters[key.strip()] = value.strip()
+                     
+                parameters = {k: smart_convert(v) for k, v in parameters.items()}
+                if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
+                    
+                    parameters = {
+                        "temperature": 0.2,
+                        "max_tokens": 500,
+                        "frequency_penalty": 0.0,
+                        'timeout': 1200
+                    }
+                # ASDFAS////////////////////////////////////////////////////
+                
+                    
+                scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+
+                creds = service_account.Credentials.from_service_account_file('cred.json', scopes=scope)
+
+                gc = gspread.service_account(filename='cred.json')
+                spreadsheet = gc.open('lifGPT')  
+                worksheet = spreadsheet.get_worksheet(0)
+                
+                def get_prompt():
+                    prompt_sheet = spreadsheet.worksheet('プロンプト') 
+                    results = []
+                    for row in prompt_sheet.get_all_values():
+                        text_b = row[0]  
+                        if text_b:
+                            results.append(text_b)
+
+                    return results
+                prompt_data = get_prompt()
+                responses = []
+                return_response = []
+                response=None
+                filename = 'output.json' 
+                
+                try:
+                    if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                        with open(filename, 'r', encoding='utf-8') as file:
+                            match_results = json.load(file)
+                    else:
+                        match_results = []
+                except json.JSONDecodeError:
+                    match_results = []
+                    
+                print("llllllllllllllllllllllll", keywordconfigs)
+                for keywordconfig in keywordconfigs:
+                    text_a = keywordconfig  
+                  
+                    current_time = datetime.datetime.now()
+                    run_directory_datetime = current_time.strftime("%Y-%m-%d-%H-%M-%S")
+                    formatted_datetime = current_time.strftime("%Y/%m/%d-%H:%M")
+                    print(formatted_datetime)
+                
+                    responses = []
+                    conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
+                    
+                    for row, prompt_text in enumerate(prompt_data, start=1):
+                        if text_a and "〇〇〇〇" in prompt_text:
+                            prompt_text = prompt_text.replace("〇〇〇〇", text_a) 
+                        else:
+                            prompt_text = f"「{text_a}」 {prompt_text}"
+
+                        if endpoint == "https://api.openai.com/v1/chat/completions":
+                            conversation_history.append({"role": "user", "content": prompt_text})
+                        else:
+                            conversation_history = prompt_text
+                        if endpoint == "https://api.openai.com/v1/chat/completions":
+                            response = client.chat.completions.create(
+                                model= model_name,
+                                messages=conversation_history,
+                                **parameters
+                            )
+                            generated_title = response.choices[0].message.content
+                            
+                        else:
+                            response = client.completions.create(
+                                model= model_name,
+                                prompt=conversation_history,
+                                **parameters
+                            )
+                            generated_title = response.choices[0].text
+                            
+                        if endpoint == "https://api.openai.com/v1/chat/completions":
+                            responses.append(response.choices[0].message.content.strip())
+                        else:
+                            responses.append(response.choices[0].text)
+                            
+                        print("GGGGGGGGGGGGGGGGGG", responses)
+                        
+                    
+                    with open(f'./result/{run_directory_datetime}.txt', 'w', encoding='utf-8') as file:
+                        file.write('\n'.join(responses))
+                        
+                    
+                    new_data = {
+                        "file_name":f'{run_directory_datetime}.txt',
+                        "site_url":upload_info["site_url"],
+                        "admin" : upload_info["admin"],
+                        "password" : upload_info["password"],
+                        "category" : upload_info["category"],
+                    }
+                    print("2222222222222222222222222222222222222222222222222222222", new_data)
+
+                    match_results.append(new_data)
+                    
+                    def post_article(new_data):
+                        file_name =new_data['file_name']            
+                        print(file_name)
+                        result_folder = './result'
+                        file_path = os.path.join(result_folder, file_name)
+                        with open(file_path, 'r', encoding='utf-8') as file:
+                            file_content = file.read()
+                            match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+                            if match:
+                                extracted_part = match.group(0)
+                                file_content = file_content.replace(extracted_part, '').strip()
+                                file_content = extracted_part + '\n' + file_content
+                                file_content = file_content.replace('★ーーー★', '')
+
+                        print("33333333333333333333333", file_content)
+                        return_response.append(file_content)
+ 
+                        site_url = new_data['site_url']
+                        wp_username = new_data['admin']
+                        wp_password = new_data['password']
+                        category = new_data.get('category', 'Temporary Article') or 'Temporary Article'
+                        
+                        print("353535353535353535", category)
+                        
+                        wp_url = f"{site_url}/xmlrpc.php"
+                        wp_client = Client(wp_url, wp_username, wp_password)
+
+                        post = WordPressPost()
+                        post.title = '仮記事(新着)'
+                        post.content = file_content
+                        post.terms_names = {
+                        'category': [category]
+                        }
+                        post.post_status = 'draft'
+
+                        wp_client.call(posts.NewPost(post))
+                        # worksheet.update('B' + str(row_number), formatted_datetime)
+                        print("completed")
+                        return "completed"
+                        
+                    post_result=post_article(new_data)
+                    print("RRRRRRRRRRRRRRRRRR", post_result)
+                    Base.status=post_result
+            
+                # ASDFAS////////////////////////////////////////////////////
+
+                if not user.is_premium:
+                    user_profile.credits -= 1
+                    user_profile.save()
+                print("444444444444444", return_response)
+                return JsonResponse({'config': return_response})
+            
+            else:
+                return JsonResponse({'error': 'GPTモデルを選択していないか、選択したモデルが正しくありません。'}, status=400)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 class GetUserCredit(APIView):
     def get(self, request):
@@ -414,22 +732,19 @@ class GetUserCredit(APIView):
             'email': request.user.email
         }
         return JsonResponse(data)
-
-class CreateArticle(APIView):
-    def post(self, request):
-        user_profile = request.user.userprofile
-        if not request.user.is_premium and user_profile.credits <= 0:
-            return HttpResponse("You have no credits left to create an article.", status=403)
-
-        if request.method == 'POST':
-            # Handle article creation
-            # ...
-
-            # Deduct one credit if the user is not premium
-            if not request.user.is_premium:
-                user_profile.credits -= 1
-                user_profile.save()
-
-            return JsonResponse({'message': 'Article created successfully'})
-
-        return HttpResponse(status=405)
+    
+class GetKeywordData(APIView):
+    def get(self, request):
+        user = request.user
+        try:
+            # Retrieve the most recent main keyword for the user
+            main_keyword = MainKeyword.objects.filter(user=user).latest('created_at').keyword
+            main_keyword_id = MainKeyword.objects.filter(user=user).latest('created_at').id
+            suggest_keyword =SuggestedKeyword.objects.filter(main_keyword_id=main_keyword_id).values_list('keyword', flat=True)
+            
+            print(main_keyword, suggest_keyword)
+            return JsonResponse({'mainkeyword': main_keyword, "suggest_keyword": list(suggest_keyword)})
+        except MainKeyword.DoesNotExist:
+            return JsonResponse({'error': 'You have no Data'}, status=400)
+    
+    

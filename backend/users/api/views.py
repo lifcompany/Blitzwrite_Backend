@@ -146,6 +146,132 @@ def send_app_email(email, verification_link):
     except Exception as e:
         print(e)
         return {"status": "error", "message": str(e)}
+    
+def send_reset_password(email, verification_link):
+    print(verification_link)
+
+    html_content = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Verification</title>
+        <style>
+            body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            }
+            .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            }
+            .header {
+            background-color: #00bda5;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+            }
+            .header h1 {
+            margin: 0;
+            }
+            .content {
+            padding: 20px;
+            }
+            .content h2 {
+            color: #3a536d;
+            font-size: 24px;
+            }
+            .content p {
+            color: #555555;
+            font-size: 16px;
+            line-height: 1.5;
+            }
+            .footer {
+            background-color: #f4f4f4;
+            color: #888888;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            }
+            .footer a {
+            color: #00bda5;
+            text-decoration: none;
+            }
+            .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 20px 0;
+            background-color: #00bda5;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 5px;
+            }
+        </style>
+        </head>
+        <body>
+        <div class="container">
+            <div class="header">
+            <h1>Reset-Password Blitzwrite</h1>
+            </div>
+            <div class="content">
+            <h2>こんにちは お客様,</h2>
+            <p>
+                パスワードリセットのリクエストを受け付けました。以下のボタンをクリックして、新しいパスワードを設定してください。
+            </p>
+            <p>
+                Click the button below to verify your email address:
+            </p>
+            <a href="{{ verification_link }}" class="button">Verify Email Address</a>
+            <div id=":im" class="a3s aiL "><a href="{{ verification_link }}" target="_blank">{{ verification_link }}</a><img alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important"><div class="yj6qo"></div><div class="adL">
+            </div></div>
+            <p>
+             このリンクは、リクエストから24時間以内にご使用ください。それ以降は無効になります。
+            </p>
+            <p>
+                もしこのリクエストに覚えがない場合は、このメールを無視しても問題ありません。お手数ですが、何かご不明点がありましたら、サポートまでご連絡ください。<br>
+                よろしくお願いいたします。
+            </p>
+            </div>
+            <div class="footer">
+            <p>
+                &copy; 2024 株式会社LIF. All rights reserved.
+            </p>
+            <p>
+                <a href="#">Unsubscribe</a> | <a href="#">Privacy Policy</a>
+            </p>
+            </div>
+        </div>
+        </body>
+        </html>
+        """
+    html_content = html_content.replace("{{ verification_link }}", verification_link)
+    message = Mail(
+    from_email='santabaner1223@gmail.com',
+    to_emails=email,
+    subject='Mail-verify',
+    html_content=html_content
+    )
+    try:
+        sg = SendGridAPIClient('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')
+        response = sg.send(message)
+        print("successfull", response.status_code)  # Print the status code
+        if response.status_code == 202:
+            print("Email sent successfully!")
+            return {"status": "success", "status_code": response.status_code}
+        else:
+            print(f"Failed to send email. Status code: {response.status_code}")
+            return {"status": "failure", "status_code": response.status_code}
+    except Exception as e:
+        print(e)
+        return {"status": "error", "message": str(e)}
 class UserViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = UserSerializer
     queryset = User.objects.all()
@@ -302,7 +428,7 @@ class ForgetPasswordView(APIView):
         try:
             user = User.objects.get(email=email)
             refresh = RefreshToken.for_user(user)
-            response = send_app_email(
+            response = send_reset_password(
                 email,
                 f"{front_url}/reset-password/?token={str(refresh.access_token)}",
             )

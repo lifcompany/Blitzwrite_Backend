@@ -24,7 +24,7 @@ jobs:
     - name: Deploy to Server
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@133.242.160.145 << 'EOF'
-          cd ~/python/posttool
+          cd ~/blitzwrite/Blitzwrite_Backend
           git remote set-url origin git@github.com:lifcompany/Blitzwrite_Backend.git
 
           eval $(ssh-agent -s)
@@ -33,7 +33,7 @@ jobs:
 
           git pull origin main
           
-          cd ~/python/Blitzwrite_Backend
+          cd ~/blitzwrite/Blitzwrite_Backend
           python3 -m venv .venv
           source .venv/bin/activate
           pip install -r requirements/local.txt

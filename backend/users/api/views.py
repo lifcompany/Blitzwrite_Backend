@@ -497,7 +497,7 @@ class GoogleLoginCheck(APIView):
     def post(self, request):
         credential = request.data.get('credential')
         print(credential)
-        clientId = "304531247476-58f940f3b0dgrupg95cdo8b51fspupdv.apps.googleusercontent.com"
+        clientId = "412305795434-j10qukf8odkfe41d3ohmjg7rcb5lo3mm.apps.googleusercontent.com"
         if not credential:
             return JsonResponse({'error': 'Google credentials not received'}, status=400)
 

@@ -456,7 +456,6 @@ class loginWithGoogle(APIView):
         name = request.data.get("name")
         email = request.data.get("email")
 
-        # Check if the user already exists
         user, created = User.objects.get_or_create(fullname=name, email=email)
         if created:
             user.fullname = name

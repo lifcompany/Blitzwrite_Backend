@@ -30,7 +30,7 @@ def send_app_email(email, verification_link):
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Verification</title>
+        <title>Eメール認証</title>
         <style>
             body {
             font-family: Arial, sans-serif;
@@ -96,30 +96,26 @@ def send_app_email(email, verification_link):
             <h1>Blitzwrite</h1>
             </div>
             <div class="content">
-            <h2>Welcome, </h2>
+            <h2>こんにちは お客様, </h2>
             <p>
-                Thank you for registering with Blitzwrite. Please verify your email address to complete your registration and activate your account.
+                Blitzwriteへの登録ありがとうございます。登録を完了し、アカウントを有効化するために、メールアドレスの確認を行ってください。
             </p>
             <p>
-                Click the button below to verify your email address:
+                以下のボタンをクリックしてメールアドレスを確認してください：
             </p>
-            <a href="{{ verification_link }}" class="button">Verify Email Address</a>
+            <a href="{{ verification_link }}" class="button">メールアドレスの確認</a>
             <div id=":im" class="a3s aiL "><a href="{{ verification_link }}" target="_blank">{{ verification_link }}</a><img alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin-top:0!important;margin-bottom:0!important;margin-right:0!important;margin-left:0!important;padding-top:0!important;padding-bottom:0!important;padding-right:0!important;padding-left:0!important"><div class="yj6qo"></div><div class="adL">
             </div></div>
             <p>
-                If you did not create an account, please ignore this email or contact our support team.
+                アカウントを作成していない場合は、このメールを無視するか、サポートチームまでご連絡ください。
             </p>
             <p>
-                Best regards,<br>
-                The Support Team
+               よろしくお願いいたします。
             </p>
             </div>
             <div class="footer">
             <p>
                 &copy; 2024 株式会社LIF. All rights reserved.
-            </p>
-            <p>
-                <a href="#">Unsubscribe</a> | <a href="#">Privacy Policy</a>
             </p>
             </div>
         </div>
@@ -240,9 +236,6 @@ def send_reset_password(email, verification_link):
             <div class="footer">
             <p>
                 &copy; 2024 株式会社LIF. All rights reserved.
-            </p>
-            <p>
-                <a href="#">Unsubscribe</a> | <a href="#">Privacy Policy</a>
             </p>
             </div>
         </div>

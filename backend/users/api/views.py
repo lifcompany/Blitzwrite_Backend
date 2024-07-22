@@ -502,7 +502,7 @@ class LoginView(APIView):
                 else:
                     return Response(
                         {
-                            "error": "Email not verified",
+                            "error": "Eメールが確認されていません",
                         },
                         status=status.HTTP_401_UNAUTHORIZED,
                     )

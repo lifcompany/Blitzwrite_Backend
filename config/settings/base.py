@@ -13,28 +13,13 @@ env = environ.Env()
 
 READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=True)
 if READ_DOT_ENV_FILE:
-    # OS environment variables take precedence over variables from .env
     env.read_env(str(BASE_DIR / ".env"))
 
-# GENERAL
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = env.bool("DJANGO_DEBUG", False)
-# Local time zone. Choices are
-# http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
-# though not all of them may be available with every OS.
-# In Windows, this must be set to your system time zone.
+
 TIME_ZONE = "UTC"
-# https://docs.djangoproject.com/en/dev/ref/settings/#language-code
+
 LANGUAGE_CODE = "en-us"
-# https://docs.djangoproject.com/en/dev/ref/settings/#languages
-# from django.utils.translation import gettext_lazy as _
-# LANGUAGES = [
-#     ('en', _('English')),
-#     ('fr-fr', _('French')),
-#     ('pt-br', _('Portuguese')),
-# ]
-# https://docs.djangoproject.com/en/dev/ref/settings/#site-id
 SITE_ID = 1
 # https://docs.djangoproject.com/en/dev/ref/settings/#use-i18n
 USE_I18N = True
@@ -55,7 +40,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#root-urlconf
 ROOT_URLCONF = "config.urls"
-# https://docs.djangoproject.com/en/dev/ref/settings/#wsgi-application
 WSGI_APPLICATION = "config.wsgi.application"
 
 # APPS
@@ -67,7 +51,6 @@ DJANGO_APPS = [
     "django.contrib.sites",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # "django.contrib.humanize", # Handy template tags
     "django.contrib.admin",
     "django.forms",
 ]
@@ -78,7 +61,6 @@ THIRD_PARTY_APPS = [
     "allauth.account",
     "allauth.mfa",
     "allauth.socialaccount",
-    "django_celery_beat",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -94,9 +76,6 @@ LOCAL_APPS = [
     "backend.output",
     "backend.sitesetting",
     "backend.seo_article",
-    "explorer"
-
-    # Your stuff: custom apps go here
 ]
 
 SOCIALACCOUNT_PROVIDERS = {
@@ -289,40 +268,6 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
 }
 
-# Celery
-# ------------------------------------------------------------------------------
-if USE_TZ:
-    # https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-timezone
-    CELERY_TIMEZONE = TIME_ZONE
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-broker_url
-CELERY_BROKER_URL = env("CELERY_BROKER_URL")
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-result_backend
-CELERY_RESULT_BACKEND = CELERY_BROKER_URL
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-extended
-CELERY_RESULT_EXTENDED = True
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-backend-always-retry
-# https://github.com/celery/celery/pull/6122
-CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#result-backend-max-retries
-CELERY_RESULT_BACKEND_MAX_RETRIES = 10
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-accept_content
-CELERY_ACCEPT_CONTENT = ["json"]
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-task_serializer
-CELERY_TASK_SERIALIZER = "json"
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std:setting-result_serializer
-CELERY_RESULT_SERIALIZER = "json"
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-time-limit
-# TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_TIME_LIMIT = 5 * 60
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#task-soft-time-limit
-# TODO: set to whatever value is adequate in your circumstances
-CELERY_TASK_SOFT_TIME_LIMIT = 60
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#beat-scheduler
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#worker-send-task-events
-CELERY_WORKER_SEND_TASK_EVENTS = True
-# https://docs.celeryq.dev/en/stable/userguide/configuration.html#std-setting-task_send_sent_event
-CELERY_TASK_SEND_SENT_EVENT = True
 # django-allauth
 # ------------------------------------------------------------------------------
 OPENAI_API_KEY='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'

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 if __name__ == "__main__":
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.base")
 
     try:
         from django.core.management import execute_from_command_line
@@ -27,6 +27,6 @@ if __name__ == "__main__":
     # This allows easy placement of apps within the interior
     # backend directory.
     current_path = Path(__file__).parent.resolve()
-    sys.path.append(str(current_path / "backend"))
+    sys.path.append(str(current_path))
 
     execute_from_command_line(sys.argv)

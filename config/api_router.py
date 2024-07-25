@@ -2,7 +2,7 @@ from django.conf import settings
 from rest_framework.routers import DefaultRouter
 from rest_framework.routers import SimpleRouter
 
-from backend.users.api.views import UserViewSet
+from users.views import UserViewSet
 from django.urls import path, include
 
 if settings.DEBUG:
@@ -13,8 +13,7 @@ else:
 router.register("users", UserViewSet)
 
 sub_urls = [
-    path('authentication/', include('users.api.urls')),
-    path('core/', include('core.urls')),
+    path('authentication/', include('users.urls')),
     path('setting/', include('sitesetting.urls')),
     path('generate/', include('seo_article.urls')),
 ]

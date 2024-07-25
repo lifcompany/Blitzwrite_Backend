@@ -65,6 +65,8 @@ target/
 # celery beat schedule file
 celerybeat-schedule
 
+local.yml
+
 # Environments
 .venv
 venv/
@@ -274,7 +276,6 @@ tags
 dump.rdb
 
 ### Project template
-backend/media/
 
 .pytest_cache/
 .ipython/

@@ -9,10 +9,6 @@ from .base import env
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = True
 
-
-# CACHES
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#caches
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -20,17 +16,10 @@ CACHES = {
     },
 }
 
-# EMAIL
-# ------------------------------------------------------------------------------
-# https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
 EMAIL_BACKEND = env(
     "DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend",
 )
 
-# WhiteNoise
-# ------------------------------------------------------------------------------
-# http://whitenoise.evans.io/en/latest/django.html#using-whitenoise-in-development
-INSTALLED_APPS = ["whitenoise.runserver_nostatic", *INSTALLED_APPS]
 
 INSTALLED_APPS += ["debug_toolbar"]
 
@@ -42,14 +31,6 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 INTERNAL_IPS = ["127.0.0.1", "10.0.2.2", "133.242.160.145"]
-if env("USE_DOCKER") == "yes":
-    import socket
-
-    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-    INTERNAL_IPS += [".".join(ip.split(".")[:-1] + ["1"]) for ip in ips]
 
 
-INSTALLED_APPS += ["django_extensions"]
-
-CELERY_TASK_EAGER_PROPAGATES = True
 

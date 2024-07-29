@@ -587,7 +587,7 @@ class DeleteUser(APIView):
         print(email, user.email)
         if user.email != email:
             return Response(
-                {"error": "Please input the correct Email Address。"},
+                {"error": "正しいメールアドレスを入力してください。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         del_user = User.objects.get(email=user)

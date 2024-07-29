@@ -492,7 +492,6 @@ class LoginView(APIView):
                                 "token": str(refresh.access_token),
                                 "user": {
                                     "email": user.email,
-                                    "permission": user.user_type,
                                     # Include any other user fields as needed
                                 },
                             },

@@ -36,7 +36,7 @@ jobs:
           cd ~/blitzwrite/Blitzwrite_Backend
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install -r requirements/local.txt
+          pip install -r requirements.txt
           pm2 restart server || pm2 start start.sh --name server
           pm2 save
 

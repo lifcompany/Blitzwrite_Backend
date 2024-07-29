@@ -206,5 +206,6 @@ CORS_ORIGIN_WHITELIST = [
     "http://133.242.160.145:3000", 
     "http://133.242.160.145", 
     "http://127.0.0.1:3000", 
-    "http://dev.blitzwrite.com"
+    "http://dev.blitzwrite.com",
+    "https://dev.blitzwrite.com"
 ]

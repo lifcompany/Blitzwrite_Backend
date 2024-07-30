@@ -32,6 +32,7 @@ import re
 
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods import posts
+from wordpress_xmlrpc.exceptions import InvalidCredentialsError, ServerConnectionError
 
 class Base:
     stop_execution=False,
@@ -40,6 +41,19 @@ class Base:
 client = OpenAI(    
         api_key=os.getenv("OPENAI_API_KEY")
 )
+    
+def check_wordpress_access(site_url, wp_username, wp_password):
+    try:
+        wp_url = f"{site_url}/xmlrpc.php"
+        wp_client = Client(wp_url, wp_username, wp_password)
+        wp_client.call(posts.GetPosts({'number': 1}))
+        return True, "Access granted"
+    except InvalidCredentialsError:
+        return False, "認証情報が無効です。ユーザー名とパスワードを確認してください。"
+    except ServerConnectionError:
+        return False, "WordPressサーバーに接続できません。サイトのURLを確認してください。"
+    except Exception as e:
+        return False, f"予期せぬエラーが発生しました: {e}"
 
 def send_Notification_email(email):
 
@@ -353,7 +367,7 @@ class CreateHeading(APIView):
                         conversation_history.append({"role": "user", "content": prompt})
                     else:
                         conversation_history = prompt
-                    print("conversation_history", conversation_history, parameters)
+                    print("conversation_history",model_name, conversation_history, parameters)
                     if endpoint == "https://api.openai.com/v1/chat/completions":
                         response = client.chat.completions.create(
                             model= model_name,
@@ -492,7 +506,18 @@ class CreateArticle(APIView):
             keywordconfigs = request.data.get('keywordconfigs', [])
             versionName = request.data.get('versionName')
             upload_info =request.data.get('upload_info')
+            wp_url=upload_info["site_url"]
+            wp_admin=upload_info["admin"]
+            wp_password=upload_info["password"]
             
+            
+            if not wp_url or not wp_admin or not wp_password:
+                return Response({'error': 'サイトのURLと管理者のログイン情報を正確に入力してください。'}, status=status.HTTP_400_BAD_REQUEST)
+
+            access_granted, access_message = check_wordpress_access(wp_url, wp_admin, wp_password)
+            if not access_granted:
+                return Response({'error': access_message}, status=status.HTTP_403_FORBIDDEN)
+
             if versionName:
                 try:
                     model = LifVersion.objects.get(model_name=versionName)

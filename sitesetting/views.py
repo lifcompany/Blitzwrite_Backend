@@ -23,6 +23,14 @@ from .serializers import SiteDataSerializer, LifVersionSerializer
 from django.views.decorators.http import require_http_methods
 import requests
 from bs4 import BeautifulSoup
+
+from wordpress_xmlrpc.exceptions import InvalidCredentialsError, ServerConnectionError
+
+import collections
+if not hasattr(collections, 'Iterable'):
+    import collections.abc
+    collections.Iterable = collections.abc.Iterable
+
 class Base:
     stop_execution = False
 
@@ -31,6 +39,20 @@ print(settings.OPENAI_API_KEY)
 print(settings.BASE_DIR)
 
 
+def check_wordpress_access(site_url, wp_username, wp_password):
+    print("check wordpress access")
+    try:
+        wp_url = f"{site_url}/xmlrpc.php"
+        wp_client = Client(wp_url, wp_username, wp_password)
+        wp_client.call(posts.GetPosts({'number': 1}))
+        return True, "Access granted"
+    except InvalidCredentialsError:
+        return False, "認証情報が無効です。ユーザー名とパスワードを確認してください。"
+    except ServerConnectionError:
+        return False, "WordPressサーバーに接続できません。サイトのURLを確認してください。"
+    except Exception as e:
+        print(e)
+        return False, f"連結に失敗しました！後で再試行してください。{e}"
 
 def get_file_list(request):
     directory = './result'
@@ -580,6 +602,17 @@ class SetSite(APIView):
         user_email = request.user.email
         data = JSONParser().parse(request)
         data['email'] = user_email
+        wp_url=data["site_url"]
+        wp_admin=data["admin_name"]
+        wp_password=data["admin_pass"]
+        print(wp_url, wp_admin, wp_password)
+        if not wp_url or not wp_admin or not wp_password:
+            return Response({'error': 'サイトのURLと管理者のログイン情報を正確に入力してください。'}, status=status.HTTP_400_BAD_REQUEST)
+
+        access_granted, access_message = check_wordpress_access(wp_url, wp_admin, wp_password)
+        if not access_granted:
+            return Response({'error': access_message}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             site_data = SiteData.objects.get(site_url=data['site_url'])
             serializer = SiteDataSerializer(site_data, data=data, partial=True)
@@ -598,7 +631,7 @@ class GetSite(APIView):
         user_email = request.user.email
         try:
             user_email = request.user.email
-            site_data_list = SiteData.objects.filter(email=user_email)
+            site_data_list = SiteData.objects.filter(email=user_email).order_by('-created_at')
             if not site_data_list.exists():
                 return Response({"error": "Site data not found"}, status=status.HTTP_404_NOT_FOUND)
             return Response({'site_data': list(site_data_list.values())}, status=status.HTTP_200_OK)

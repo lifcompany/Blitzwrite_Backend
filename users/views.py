@@ -353,12 +353,10 @@ class RegisterView(APIView):
             )
 
 
-# class GoogleRegister(APIView):
-
 User = get_user_model()
 class GoogleRegister(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSerializer # Create a serializer for user registration
+    serializer_class = UserSerializer 
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -371,9 +369,9 @@ class GoogleRegister(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = serializer.save()
-        user.is_active = True  # Activate user upon registration
+        user.is_active = True
         user.save()
-        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)  # Mark email as verified
+        EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
         return user
     
 
@@ -384,29 +382,7 @@ class MailVerifyView(APIView):
         user.mail_verify_statu = True
         user.save()
         return Response({"success": "Email verified"}, status=status.HTTP_200_OK)
-
-
-# class MailVerifyView(APIView):
-#     permission_classes = (permissions.AllowAny,)
-
-#     def post(self, request):
-#         serializer = MailVerifySerializer(data=request.data)
-#         if serializer.is_valid():
-#             token = serializer.validated_data['token']
-#             try:
-#                 # refresh = RefreshToken(token)
-#                 user_id = "refresh['user_id']"
-#                 user = User.objects.get(id=user_id)
-#                 print("11111111", user)
-#                 if not user.mail_verify_statu:
-#                     user.mail_verify_statu = True
-#                     user.save()
-#                     return Response({"message": "User successfully verified"}, status=status.HTTP_200_OK)
-#                 else:
-#                     return Response({"message": "User is already verified"}, status=status.HTTP_400_BAD_REQUEST)
-#             except Exception as e:
-#                 return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class ForgetPasswordView(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = ()
@@ -431,7 +407,7 @@ class ForgetPasswordView(APIView):
                 return Response(
                     {
                         "error": "認証リンクを送信できませんでした。",
-                        "details": response  # Optional: Include details for debugging
+                        "details": response
                     },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -492,7 +468,6 @@ class LoginView(APIView):
                                 "token": str(refresh.access_token),
                                 "user": {
                                     "email": user.email,
-                                    # Include any other user fields as needed
                                 },
                             },
                             "navigate": "/home",
@@ -519,7 +494,6 @@ class LoginView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-            # return Response(serializer.error_messages)
 
 
 class GetUserView(APIView):
@@ -537,7 +511,6 @@ class GetUserView(APIView):
                         "user": {
                             "username": user.fullname,
                             "email": user.email,
-                            # Include any other user fields as needed
                         },
                     }
                 },
@@ -552,10 +525,8 @@ class GetUserView(APIView):
 
 class GetUserInfo(APIView):
     def post(self, request):
-        # Retrieve all users from the database
         all_users = User.objects.all()
 
-        # Extract relevant information (username and email) from each user object
         users_info = [
             {"username": user.fullname, "email": user.email} for user in all_users
         ]
@@ -647,7 +618,6 @@ class GoogleLoginCheck(APIView):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     def get_google_public_key(self, kid):
-        # Get Google's public keys
         response = requests.get("https://www.googleapis.com/oauth2/v3/certs")
         if response.status_code != 200:
             raise ValueError("Failed to fetch Google public keys")
@@ -674,11 +644,7 @@ class GoogleLoginCheck2(APIView):
             token_info = response.json()
 
             if response.status_code == 200:
-                # Token is valid, proceed with your logic (e.g., register user, generate JWT token)
-                # Example logic: register or authenticate the user based on token info
                 email = token_info.get('email')
-                # Add your logic here to register or authenticate the user
-                # Example: user = User.objects.get(email=email)
                 if not email:
                     return JsonResponse({'error': 'Failed to extract email from Google credentials'}, status=400)
             
@@ -697,15 +663,10 @@ class GoogleLoginCheck2(APIView):
                     } 
                 )
             else:
-                # Token validation failed, handle the error
                 return JsonResponse({'error': 'Invalid access token'}, status=401)
 
         except requests.exceptions.RequestException as e:
-            # Handle network or server errors
             return JsonResponse({'error': f'Request failed: {e}'}, status=500)
-
-
-
 
 class CheckPremiumStatus(APIView):
 

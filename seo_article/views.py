@@ -34,6 +34,11 @@ from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods import posts
 from wordpress_xmlrpc.exceptions import InvalidCredentialsError, ServerConnectionError
 
+import collections
+if not hasattr(collections, 'Iterable'):
+    import collections.abc
+    collections.Iterable = collections.abc.Iterable
+
 class Base:
     stop_execution=False,
     status=""

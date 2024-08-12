@@ -22,6 +22,5 @@ urlpatterns = [
     # path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
     path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
     path('webhook/', stripe_webhook, name='stripe-webhook'),
-    # path('get-user-card-info/', get_user_card_info, name='get-user-card-info'),
 
 ]

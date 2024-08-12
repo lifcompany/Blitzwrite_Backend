@@ -2,6 +2,5 @@ developer_token: "zBPFy2YjDpSe6bdNcP1JVA"
 client_id: "632364236624-u04q1d1uvppg5ck409gvf7e1gqbk72t7.apps.googleusercontent.com"
 client_secret: "XtgKSmCpp0zPjwmNdl0M_cRD"
 refresh_token: "1//0en5lDs7cJTptCgYIARAAGA4SNwF-L9IrP0iAcKaXso9V8qNNSBekiEPoZ1bhiJirwAxx3LGYaWCgCeLZKE9roVcxlBhAv0brsPk"
-# login_customer_id: "9576760560" # This is optional if you're using a manager account
-login_customer_id: "9952679872" # This is optional if you're using a manager account
+login_customer_id: "9952679872"
 use_proto_plus: True

@@ -1,8 +1,9 @@
 import requests
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.utils.text import slugify
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -68,7 +69,7 @@ def send_Notification_email(email):
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Generated Articles</title>
+        <title>記事作成完了</title>
         <style>
             body {
             font-family: Arial, sans-serif;
@@ -131,28 +132,22 @@ def send_Notification_email(email):
         <body>
         <div class="container">
             <div class="header">
-            <h1>Blitzwrite</h1>
+            <h1>Blitzwrite-記事作成完了</h1>
             </div>
             <div class="content">
-            <h2>Welcome, </h2>
+            <h2>記事作成完了! </h2>
             <p>
-                Thank you for registering with Blitzwrite. Please verify your email address to complete your registration and activate your account.
+                Blitzwriteをご利用いただきありがとうございます。<br> 
+                記事作成を完了しました。
             </p>
             <p>
-                Genreted 10/6
+                確認リンク:  https://dev.blitzwrite.com/artgen/generated
             </p>
 
-            <p>
-                Best regards,<br>
-                The Support Team
-            </p>
             </div>
             <div class="footer">
             <p>
                 &copy; 2024 株式会社LIF. All rights reserved.
-            </p>
-            <p>
-                <a href="#">Unsubscribe</a> | <a href="#">Privacy Policy</a>
             </p>
             </div>
         </div>
@@ -329,7 +324,7 @@ class CreateHeading(APIView):
             user = request.user
             user_profile = UserProfile.objects.get(user=user)
             if not user.is_premium and user_profile.credits <= 0:
-                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
+                return JsonResponse({'error': '記事を作成するためのクレジットがありません。'}, status=403)
 
             keywords = request.data.get('keywords', [])
             versionName = request.data.get('versionName')
@@ -390,10 +385,6 @@ class CreateHeading(APIView):
                         )
                         generated_title = response.choices[0].text                    
                     responses.append(generated_title.strip())
-
-                if not user.is_premium:
-                    user_profile.credits -= 1
-                    user_profile.save()
                 return JsonResponse({'title': responses})
             
             else:
@@ -408,7 +399,7 @@ class CreateConfig(APIView):
             user = request.user
             user_profile = UserProfile.objects.get(user=user)
             if not user.is_premium and user_profile.credits <= 0:
-                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
+                return JsonResponse({'error': '記事を作成するためのクレジットがありません。'}, status=403)
 
             keywords = request.data.get('keywords', [])
             versionName = request.data.get('versionName')
@@ -489,9 +480,6 @@ class CreateConfig(APIView):
                     print("ssssssssssssssssssssss", extracted_list)
                 
                     responses.append(extracted_list)
-                if not user.is_premium:
-                    user_profile.credits -= 1
-                    user_profile.save()
 
                 return JsonResponse({'config': responses})
             
@@ -506,15 +494,16 @@ class CreateArticle(APIView):
             user = request.user
             user_profile = UserProfile.objects.get(user=user)
             if not user.is_premium and user_profile.credits <= 0:
-                return JsonResponse({'error': 'You have no credits left to create an article.'}, status=403)
+                return JsonResponse({'error': '記事を作成するためのクレジットがありません。'}, status=400)
 
-            keywordconfigs = request.data.get('keywordconfigs', [])
+            keywordconfigs = request.data.get('keywordconfigs')
+            
+            print("------------------------", keywordconfigs)
             versionName = request.data.get('versionName')
             upload_info =request.data.get('upload_info')
             wp_url=upload_info["site_url"]
             wp_admin=upload_info["admin"]
             wp_password=upload_info["password"]
-            
             
             if not wp_url or not wp_admin or not wp_password:
                 return Response({'error': 'サイトのURLと管理者のログイン情報を正確に入力してください。'}, status=status.HTTP_400_BAD_REQUEST)
@@ -523,172 +512,154 @@ class CreateArticle(APIView):
             if not access_granted:
                 return Response({'error': access_message}, status=status.HTTP_403_FORBIDDEN)
 
-            if versionName:
-                try:
-                    model = LifVersion.objects.get(model_name=versionName)
-                    print("model", model)
-                except LifVersion.DoesNotExist:
-                    
-                    return JsonResponse({'error': 'Invalid versionName'}, status=400)
-
-                model_name = model.model_name
-                endpoint = model.endpoint
-                params = model.params
-                param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
-                parameters = {}
-                for line in param_lines:
-                    key, value = line.split('=')
-                    parameters[key.strip()] = value.strip()
-                     
-                parameters = {k: smart_convert(v) for k, v in parameters.items()}
-                if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
-                    
-                    parameters = {
-                        "temperature": 0.2,
-                        "max_tokens": 500,
-                        "frequency_penalty": 0.0,
-                        'timeout': 1200
-                    }
-                    
-                gc = gspread.service_account(filename='cred.json')
-                spreadsheet = gc.open('lifGPT')                  
-                def get_prompt():
-                    prompt_sheet = spreadsheet.worksheet('プロンプト') 
-                    results = []
-                    for row in prompt_sheet.get_all_values():
-                        text_b = row[0]  
-                        if text_b:
-                            results.append(text_b)
-
-                    return results
-                prompt_data = get_prompt()
-                responses = []
-                return_response = []
-                response=None
-                filename = 'output.json' 
-                
-                try:
-                    if os.path.exists(filename) and os.path.getsize(filename) > 0:
-                        with open(filename, 'r', encoding='utf-8') as file:
-                            match_results = json.load(file)
-                    else:
-                        match_results = []
-                except json.JSONDecodeError:
-                    match_results = []
-                    
-                print("llllllllllllllllllllllll", keywordconfigs)
-                for keywordconfig in keywordconfigs:
-                    text_a = keywordconfig  
-                  
-                    current_time = datetime.datetime.now()
-                    run_directory_datetime = current_time.strftime("%Y-%m-%d-%H-%M-%S")
-                    formatted_datetime = current_time.strftime("%Y/%m/%d-%H:%M")
-                    print(formatted_datetime)
-                
-                    responses = []
-                    conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
-                    
-                    for row, prompt_text in enumerate(prompt_data, start=1):
-                        if text_a and "〇〇〇〇" in prompt_text:
-                            prompt_text = prompt_text.replace("〇〇〇〇", text_a) 
-                        else:
-                            prompt_text = f"「{text_a}」 {prompt_text}"
-
-                        if endpoint == "https://api.openai.com/v1/chat/completions":
-                            conversation_history.append({"role": "user", "content": prompt_text})
-                        else:
-                            conversation_history = prompt_text
-                        if endpoint == "https://api.openai.com/v1/chat/completions":
-                            response = client.chat.completions.create(
-                                model= model_name,
-                                messages=conversation_history,
-                                **parameters
-                            )
-                            generated_title = response.choices[0].message.content
-                            
-                        else:
-                            response = client.completions.create(
-                                model= model_name,
-                                prompt=conversation_history,
-                                **parameters
-                            )
-                            generated_title = response.choices[0].text
-                            
-                        if endpoint == "https://api.openai.com/v1/chat/completions":
-                            responses.append(response.choices[0].message.content.strip())
-                        else:
-                            responses.append(response.choices[0].text)
-                            
-                        print("GGGGGGGGGGGGGGGGGG", responses)
-                        
-                    
-                    with open(f'./result/{run_directory_datetime}.txt', 'w', encoding='utf-8') as file:
-                        file.write('\n'.join(responses))
-                        
-                    
-                    new_data = {
-                        "file_name":f'{run_directory_datetime}.txt',
-                        "site_url":upload_info["site_url"],
-                        "admin" : upload_info["admin"],
-                        "password" : upload_info["password"],
-                        "category" : upload_info["category"],
-                    }
-                    print("2222222222222222222222222222222222222222222222222222222", new_data)
-
-                    match_results.append(new_data)
-                    
-                    def post_article(new_data):
-                        file_name =new_data['file_name']            
-                        print(file_name)
-                        result_folder = './result'
-                        file_path = os.path.join(result_folder, file_name)
-                        with open(file_path, 'r', encoding='utf-8') as file:
-                            file_content = file.read()
-                            match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
-                            if match:
-                                extracted_part = match.group(0)
-                                file_content = file_content.replace(extracted_part, '').strip()
-                                file_content = extracted_part + '\n' + file_content
-                                file_content = file_content.replace('★ーーー★', '')
-
-                        return_response.append(file_content)
- 
-                        site_url = new_data['site_url']
-                        wp_username = new_data['admin']
-                        wp_password = new_data['password']
-                        category = new_data.get('category', 'Temporary Article') or 'Temporary Article'
-   
-                        wp_url = f"{site_url}/xmlrpc.php"
-                        wp_client = Client(wp_url, wp_username, wp_password)
-
-                        post = WordPressPost()
-                        post.title = '仮記事(新着)'
-                        post.content = file_content
-                        post.terms_names = {
-                        'category': [category]
-                        }
-                        post.post_status = 'draft'
-                        wp_client.call(posts.NewPost(post))
-                        print("completed")
-                        return "completed"
-                        
-                    post_result=post_article(new_data)
-                    print("RRRRRRRRRRRRRRRRRR", post_result)
-                    Base.status=post_result
-
-                if not user.is_premium:
-                    user_profile.credits -= 1
-                    user_profile.save()
-                print("444444444444444", return_response)
-                return JsonResponse({'config': return_response})
-            
-            else:
+            if not versionName:
                 return JsonResponse({'error': 'GPTモデルを選択していないか、選択したモデルが正しくありません。'}, status=400)
+                        
+            model = self.get_lif_model(versionName)
+            if not model:
+                return JsonResponse({'error': 'Invalid versionName'}, status=400)
+
+            model_name = model.model_name
+            endpoint = model.endpoint
+            params = model.params
+            param_lines = [item.strip() for item in params.replace('\n', ',').split(',') if item.strip()]
+            parameters = {}
+            for line in param_lines:
+                key, value = line.split('=')
+                parameters[key.strip()] = value.strip()
+                    
+            parameters = {k: smart_convert(v) for k, v in parameters.items()}
+            if params == "" and endpoint == "https://api.openai.com/v1/chat/completions":
+                
+                parameters = {
+                    "temperature": 0.2,
+                    "max_tokens": 500,
+                    "frequency_penalty": 0.0,
+                    'timeout': 1200
+                }
+            prompt_data = self.get_prompt()
+            match_results = self.load_match_results()
+            return_response = []
+            response=None
+            # filename = 'output.json' 
             
+            # try:
+            #     if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            #         with open(filename, 'r', encoding='utf-8') as file:
+            #             match_results = json.load(file)
+            #     else:
+            #         match_results = []
+            # except json.JSONDecodeError:
+            #     match_results = []
+                            
+            # for keyword_config in keywordconfigs:
+            responses = []
+            conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
+            
+            for row, prompt_text in enumerate(prompt_data, start=1):
+                if keywordconfigs and "〇〇〇〇" in prompt_text:
+                    prompt_text = prompt_text.replace("〇〇〇〇", keywordconfigs) 
+                else:
+                    prompt_text = f"「{keywordconfigs}」 {prompt_text}"
+
+                if endpoint == "https://api.openai.com/v1/chat/completions":
+                    conversation_history.append({"role": "user", "content": prompt_text})
+                    response = client.chat.completions.create(  model= model_name,  messages=conversation_history, **parameters)
+                    responses.append(response.choices[0].message.content.strip())
+                else:
+                    conversation_history = prompt_text
+                    response = client.completions.create(  model= model_name, prompt=conversation_history, **parameters )
+                    responses.append(response.choices[0].text)                    
+            print("Output:", responses)
+            
+            current_time = datetime.datetime.now()
+            run_directory_datetime = current_time.strftime("%Y-%m-%d-%H-%M-%S")
+            filename = f'{run_directory_datetime}.txt'
+            with open(f'./result/{filename}', 'w', encoding='utf-8') as file:
+                file.write('\n'.join(responses))
+                
+            new_data = {
+                "file_name":filename,
+                "site_url":upload_info["site_url"],
+                "admin" : upload_info["admin"],
+                "password" : upload_info["password"],
+                "category" : upload_info["category"],
+            }
+
+            match_results.append(new_data)
+            
+            def post_article(new_data):
+                file_path = os.path.join('./result', new_data['file_name'] )
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    file_content = file.read()
+                    match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+                    if match:
+                        extracted_part = match.group(0)
+                        file_content = file_content.replace(extracted_part, '').strip()
+                        file_content = extracted_part + '\n' + file_content
+                        file_content = file_content.replace('★ーーー★', '')
+
+                return_response.append(file_content)
+
+
+                wp_url = f"{new_data['site_url']}/xmlrpc.php"
+                wp_client = Client(wp_url, new_data['admin'], new_data['password'])
+                category = new_data.get('category', 'Temporary Article') or 'Temporary Article'
+
+                post = WordPressPost()
+                post.title = '仮記事(新着)'
+                post.content = file_content
+                post.terms_names = { 'category': [category] }
+                post.post_status = 'draft'
+                
+                wp_client.call(posts.NewPost(post))
+                
+                return "completed"
+                
+            post_result=post_article(new_data)
+            Base.status=post_result
+
+            if not user.is_premium:
+                user_profile.credits -= 1
+                user_profile.save()
+                
+            return JsonResponse({'config': return_response})            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    
+    
+    def get_lif_model(self, version_name):
+        try:
+            return LifVersion.objects.get(model_name=version_name)
+        except LifVersion.DoesNotExist:
+            return None
 
+    def get_prompt_data(self):
+        gc = gspread.service_account(filename='cred.json')
+        spreadsheet = gc.open('lifGPT')
+        prompt_sheet = spreadsheet.worksheet('プロンプト')
+        return [row[0] for row in prompt_sheet.get_all_values() if row[0]]
+    
+    def get_prompt(self):
+        gc = gspread.service_account(filename='cred.json')
+        spreadsheet = gc.open('lifGPT')  
+        prompt_sheet = spreadsheet.worksheet('プロンプト') 
+        results = []
+        for row in prompt_sheet.get_all_values():
+            if row[0] :
+                results.append(row[0])
+        return results
+    
+    def load_match_results(self):
+        filename = 'output.json'
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    return json.load(file)
+            except json.JSONDecodeError:
+                return []
+        return []
 
 class GetUserCredit(APIView):
     def get(self, request):

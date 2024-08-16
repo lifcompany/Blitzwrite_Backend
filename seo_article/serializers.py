@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Keyword, SuggestedKeyword
+from .models import Keyword, SuggestedKeyword, Notification
 
 class SuggestKeywordSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,3 +11,7 @@ class SuggestKeywordSerializer(serializers.ModelSerializer):
         keyword_instance = SuggestedKeyword.objects.create(main_keyword=main_keyword, **validated_data)
         return keyword_instance
         
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'content', 'read', 'timestamp']

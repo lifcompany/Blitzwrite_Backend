@@ -1,7 +1,7 @@
 # urls.py
 
 from django.urls import path
-from .views import get_file_list, GetModel, add_new_version, get_edit_version, delete_model, delete_files, get_file_content, post_article, run_script, stop_script, SetSite, GetSite, get_site_title, update_model, create_payment_intent, stripe_webhook
+from .views import get_file_list, GetModel, add_new_version, get_edit_version, delete_model, delete_files, get_file_content, post_article, run_script, stop_script, SetSite, GetSite, get_site_title, update_model, create_payment_intent, stripe_webhook, payment_method, setup_intent
 
 
 urlpatterns = [
@@ -19,8 +19,9 @@ urlpatterns = [
     path('set_site/', SetSite.as_view(), name='set_site'),
     path('get_site/', GetSite.as_view(), name='get_site'),
     path('get-title/', get_site_title, name='get-title'),
-    # path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
     path('create-payment-intent/', create_payment_intent, name='create-payment-intent'),
+    path('payment-method/', payment_method, name='payment-method'),
+    path('setup-intent/', setup_intent, name='setup-intent'),
     path('webhook/', stripe_webhook, name='stripe-webhook'),
 
 ]

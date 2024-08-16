@@ -684,6 +684,76 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
+@api_view(['GET', 'DELETE', 'PATCH'])
+def payment_method(request):
+    print(request.user)
+    if request.method == "GET":
+        # retrieve current payment methods for the customer
+        # usually there should only be one payment method per customer
+        email = request.user.email
+        print(email)
+        for customer in stripe.Customer.list(email=email).data:
+            for payment_method in customer.list_payment_methods(type="card").data:
+                return Response({
+                    "id": payment_method["id"],
+                    "last4": payment_method["card"]["last4"],
+                    "exp_month": payment_method["card"]["exp_month"],
+                    "exp_year": payment_method["card"]["exp_year"],
+                })
+        else:
+            return Response(None)
+
+    elif request.method == "DELETE":
+        # remove all payment methods from the customer
+        email = request.user.email
+        for customer in stripe.Customer.list(email=email).data:
+            for payment_method in customer.list_payment_methods(type="card").data:
+                stripe.PaymentMethod.detach(payment_method["id"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    elif request.method == "PATCH":
+        # detach all other payment methods from the customer
+        # except the one specified in the request
+        # essentially updating the customer's payment methods
+        payment_method_id = request.query_params["id"]
+        email = request.user.email
+        for customer in stripe.Customer.list(email=email).data:
+            for payment_method in customer.list_payment_methods(type="card").data:
+                if payment_method["id"] != payment_method_id:
+                    stripe.PaymentMethod.detach(payment_method["id"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    else:
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+@api_view(['POST'])
+def setup_intent(request):
+    if request.method == 'POST':
+        email = request.user.email
+
+        # make sure we don't create a duplicate customer for the same email
+        customers = stripe.Customer.list(email=email).data
+        if customers:
+            customer = customers[0]
+        else:
+            customer = stripe.Customer.create(
+                email=email,
+            )
+
+        try:
+            intent = stripe.SetupIntent.create(
+                automatic_payment_methods={"enabled": True},
+                customer=customer.id)
+
+            return Response({
+                'id': intent.id,
+                'clientSecret': intent.client_secret
+            })
+        except stripe.error.InvalidRequestError as e:
+            print(e)
+            return Response("Invalid request", status=400)
+    else:
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
 @api_view(['POST'])
 def stripe_webhook(request):
     payload = request.body

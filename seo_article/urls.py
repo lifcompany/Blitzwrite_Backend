@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import autosuggest, KeywordSuggest, SendNotificationEmail, SaveKeywords, CreateHeading, CreateConfig, GetUserCredit, CreateArticle,GetKeywordData
+from .views import autosuggest, KeywordSuggest, SendNotificationEmail, SaveKeywords, CreateHeading, CreateConfig, GetUserCredit, CreateArticle,GetKeywordData, fetch_clicks_from_search_console
 
 urlpatterns = [
     path('auto-suggest/', autosuggest, name='autosuggest'),
@@ -13,4 +13,6 @@ urlpatterns = [
     path('create-heading/', CreateHeading.as_view(), name='create_heading'),
     path('create-config/', CreateConfig.as_view(), name='create_config'),
     path('create-article/', CreateArticle.as_view(), name='create_article'),
+    
+     path('fetch-clicks/', fetch_clicks_from_search_console, name='fetch-clicks'),
 ]

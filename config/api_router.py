@@ -4,7 +4,7 @@ from rest_framework.routers import SimpleRouter
 
 from users.views import UserViewSet
 from django.urls import path, include
-from seo_article.views import NotificationViewSet
+from seo_article.views import NotificationViewSet, ArticleViewSet
 
 if settings.DEBUG:
     router = DefaultRouter()
@@ -13,6 +13,7 @@ else:
 
 router.register("users", UserViewSet)
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'articles', ArticleViewSet, basename='articles')
 
 sub_urls = [
     path('authentication/', include('users.urls')),

@@ -41,3 +41,23 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username}: {self.content}"
+    
+class Article(models.Model):
+    STATUS_CHOICES = [
+        ('public', 'Public'),
+        ('draft', 'Draft'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    site_url = models.CharField(max_length=255, default='')
+    keywords = models.TextField(max_length=255)  # Store keywords as a comma-separated string
+    amount = models.IntegerField(default=0)  # Store keywords as a comma-separated string
+    wp_status = models.CharField(max_length=10)
+    category = models.CharField(max_length=255, blank=True, null=True)  # New field for category
+    current_clicks = models.IntegerField(default=0)  # New field for current clicks, initialized to 0
+    last_month_clicks = models.IntegerField(default=0)  # New field for last month's clicks, initialized to 0
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title

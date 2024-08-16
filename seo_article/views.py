@@ -4,6 +4,7 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils.text import slugify
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -19,7 +20,7 @@ from sendgrid.helpers.mail import Mail
 from .serializers import SuggestKeywordSerializer
 
 from rest_framework import status
-from .models import MainKeyword, SuggestedKeyword
+from .models import MainKeyword, SuggestedKeyword, Article
 from sitesetting.models import LifVersion
 
 from .models import UserProfile
@@ -31,6 +32,9 @@ import datetime
 import gspread
 import re
 
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods import posts
 from wordpress_xmlrpc.exceptions import InvalidCredentialsError, ServerConnectionError
@@ -39,7 +43,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Notification
-from .serializers import NotificationSerializer
+from .serializers import NotificationSerializer, ArticleSerializer
 from rest_framework.decorators import action
 
 import collections
@@ -508,6 +512,7 @@ class CreateArticle(APIView):
             print("------------------------", keywordconfigs)
             versionName = request.data.get('versionName')
             upload_info =request.data.get('upload_info')
+            mainkeyword = request.data.get('mainkeyword')
             wp_url=upload_info["site_url"]
             wp_admin=upload_info["admin"]
             wp_password=upload_info["password"]
@@ -548,18 +553,6 @@ class CreateArticle(APIView):
             match_results = self.load_match_results()
             return_response = []
             response=None
-            # filename = 'output.json' 
-            
-            # try:
-            #     if os.path.exists(filename) and os.path.getsize(filename) > 0:
-            #         with open(filename, 'r', encoding='utf-8') as file:
-            #             match_results = json.load(file)
-            #     else:
-            #         match_results = []
-            # except json.JSONDecodeError:
-            #     match_results = []
-                            
-            # for keyword_config in keywordconfigs:
             responses = []
             conversation_history = [{"role": "system", "content": "You are a helpful assistant."}]
             
@@ -593,21 +586,12 @@ class CreateArticle(APIView):
                 "category" : upload_info["category"],
             }
 
-            match_results.append(new_data)
-            
+            match_results.append(new_data)            
             def post_article(new_data):
                 file_path = os.path.join('./result', new_data['file_name'] )
-                with open(file_path, 'r', encoding='utf-8') as file:
-                    file_content = file.read()
-                    match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
-                    if match:
-                        extracted_part = match.group(0)
-                        file_content = file_content.replace(extracted_part, '').strip()
-                        file_content = extracted_part + '\n' + file_content
-                        file_content = file_content.replace('★ーーー★', '')
+                file_content = self.prepare_post_content(file_path)
 
                 return_response.append(file_content)
-
 
                 wp_url = f"{new_data['site_url']}/xmlrpc.php"
                 wp_client = Client(wp_url, new_data['admin'], new_data['password'])
@@ -629,12 +613,34 @@ class CreateArticle(APIView):
             if not user.is_premium:
                 user_profile.credits -= 1
                 user_profile.save()
-                
-            return JsonResponse({'config': return_response})            
+            
+            article = Article.objects.create(
+                user=user,
+                site_url= upload_info["site_url"],
+                title='仮記事(新着)',
+                keywords = mainkeyword,
+                wp_status="draft",
+                category=new_data.get('category', 'Temporary Article') or 'Temporary Article',
+                current_clicks=0,
+                last_month_clicks=0,
+                created_at=timezone.now()
+            )
+            
+            return JsonResponse({'article_id': article.id}, status=201)            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
+    def prepare_post_content(self, file_path):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            file_content = file.read()
+            match = re.search(r'★ーーー★.*?★ーーー★', file_content, re.DOTALL)
+            if match:
+                extracted_part = match.group(0)
+                file_content = file_content.replace(extracted_part, '').strip()
+                file_content = extracted_part + '\n' + file_content
+                file_content = file_content.replace('★ーーー★', '')
+
+        return file_content   
     
     def get_lif_model(self, version_name):
         try:
@@ -707,3 +713,68 @@ class NotificationViewSet(viewsets.ModelViewSet):
         notifications = Notification.objects.filter(user=request.user, read=False)
         notifications.update(read=True)  # Mark all unread notifications as read
         return Response({"status": "all notifications marked as read"})
+    
+class ArticleViewSet(viewsets.ModelViewSet):
+    serializer_class = ArticleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        site_url = self.request.query_params.get('site_url', None)
+        queryset = Article.objects.filter(user=user)
+        if site_url:
+            queryset = queryset.filter(site_url=site_url)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user) 
+        
+        
+def fetch_clicks_from_search_console(request):
+    
+    CREDENTIALS_FILE = "cred.json"  # Path to your OAuth2 credentials JSON file
+    SITE_URL = "https://kurumapro.net" 
+    try:
+        # Set up OAuth2 credentials
+        credentials = service_account.Credentials.from_service_account_file(
+            CREDENTIALS_FILE, scopes=["https://www.googleapis.com/auth/webmasters.readonly"]
+        )
+
+        # Build the Search Console service
+        service = build('webmasters', 'v3', credentials=credentials)
+
+        # Set the date range
+        start_date = "2023-07-01"  # You can dynamically set these dates
+        end_date = "2023-07-31"
+
+        # Fetch search analytics data from Google Search Console
+        response = service.searchanalytics().query(
+            siteUrl=SITE_URL,
+            body={
+                "startDate": start_date,
+                "endDate": end_date,
+                "dimensions": ["page"],
+                "rowLimit": 5000,
+            },
+        ).execute()
+
+        # Extract the number of clicks for each article (page)
+        article_clicks = []
+        for row in response.get("rows", []):
+            page_url = row["keys"][0]
+            clicks = row["clicks"]
+            article_clicks.append({
+                "page_url": page_url,
+                "clicks": clicks,
+            })
+
+        return JsonResponse({
+            "status": "success",
+            "data": article_clicks,
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e),
+        })

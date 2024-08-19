@@ -732,22 +732,18 @@ class ArticleViewSet(viewsets.ModelViewSet):
         
 def fetch_clicks_from_search_console(request):
     
-    CREDENTIALS_FILE = "cred.json"  # Path to your OAuth2 credentials JSON file
+    CREDENTIALS_FILE = "cred.json"
     SITE_URL = "https://kurumapro.net" 
     try:
-        # Set up OAuth2 credentials
         credentials = service_account.Credentials.from_service_account_file(
             CREDENTIALS_FILE, scopes=["https://www.googleapis.com/auth/webmasters.readonly"]
         )
 
-        # Build the Search Console service
         service = build('webmasters', 'v3', credentials=credentials)
 
-        # Set the date range
-        start_date = "2023-07-01"  # You can dynamically set these dates
+        start_date = "2023-07-01" 
         end_date = "2023-07-31"
 
-        # Fetch search analytics data from Google Search Console
         response = service.searchanalytics().query(
             siteUrl=SITE_URL,
             body={
@@ -758,7 +754,6 @@ def fetch_clicks_from_search_console(request):
             },
         ).execute()
 
-        # Extract the number of clicks for each article (page)
         article_clicks = []
         for row in response.get("rows", []):
             page_url = row["keys"][0]
